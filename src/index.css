@@ -1,0 +1,86 @@
+@import "tailwindcss";
+
+:root {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f7f7f5;
+  --border: #e8e8e4;
+  --text-primary: #1a1a1a;
+  --text-secondary: #6b6b6b;
+  --text-muted: #a0a0a0;
+  --accent: #6c47ff;
+  --accent-light: #f3f0ff;
+  --accent-hover: #5a38e0;
+  --success: #0f9b6e;
+  --success-light: #e6f7f2;
+  --warning: #e8a020;
+  --warning-light: #fef3e2;
+  --danger: #e03e3e;
+  --danger-light: #fde8e8;
+  --skeleton: #e8e8e4;
+}
+
+.dark {
+  --bg-primary: #111110;
+  --bg-secondary: #1a1a18;
+  --border: #2e2e2b;
+  --text-primary: #f0f0ee;
+  --text-secondary: #9a9a96;
+  --text-muted: #6b6b68;
+  --accent: #7c5cff;
+  --accent-light: #1e1a30;
+  --accent-hover: #6c47ff;
+  --success: #0f9b6e;
+  --success-light: #0d2620;
+  --warning: #e8a020;
+  --warning-light: #2a2010;
+  --danger: #e03e3e;
+  --danger-light: #2a1010;
+  --skeleton: #2e2e2b;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-primary);
+  background-color: var(--bg-primary);
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(90deg, var(--skeleton) 25%, color-mix(in srgb, var(--skeleton) 60%, white) 50%, var(--skeleton) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes slideInUp {
+  from { transform: translateY(8px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes fadeScaleIn {
+  from { opacity: 0; transform: scale(0.97); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.animate-slide-up { animation: slideInUp 180ms ease-out forwards; }
+.animate-fade-scale { animation: fadeScaleIn 150ms ease-out forwards; }
