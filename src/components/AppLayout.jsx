@@ -5,9 +5,12 @@ import {
   IconWand,
   IconLayoutList,
   IconHelpCircle,
+  IconSun,
+  IconMoon,
 } from '@tabler/icons-react'
 import Sidebar from './Sidebar'
 import { useWindowWidth } from '../hooks/useWindowWidth'
+import { useTheme } from '../context/ThemeContext'
 
 const BOTTOM_NAV = [
   { to: '/settings', icon: IconSettings, label: 'Settings' },
@@ -20,6 +23,8 @@ const BOTTOM_NAV = [
 export default function AppLayout({ isActive, plan }) {
   const width = useWindowWidth()
   const mobileNav = width > 0 && width < 400
+  const { theme, toggle } = useTheme()
+  const isDark = theme === 'dark'
 
   return (
     <div
@@ -39,14 +44,12 @@ export default function AppLayout({ isActive, plan }) {
         <Outlet />
       </main>
 
-      {/* Mobile bottom navigation — only < 400px */}
+      {/* Mobile bottom nav — only < 400px */}
       {mobileNav && (
         <nav
           style={{
             position: 'fixed',
-            bottom: 0,
-            left: 0,
-            right: 0,
+            bottom: 0, left: 0, right: 0,
             height: 56,
             backgroundColor: 'var(--bg-primary)',
             borderTop: '1px solid var(--border)',
@@ -77,6 +80,31 @@ export default function AppLayout({ isActive, plan }) {
               {label}
             </NavLink>
           ))}
+
+          {/* Theme toggle — last slot in bottom nav */}
+          <button
+            type="button"
+            onClick={toggle}
+            title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+            style={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 2,
+              color: 'var(--text-muted)',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: 10,
+              fontFamily: 'inherit',
+              transition: 'color 120ms',
+            }}
+          >
+            {isDark ? <IconSun size={18} /> : <IconMoon size={18} />}
+            {isDark ? 'Light' : 'Dark'}
+          </button>
         </nav>
       )}
     </div>

@@ -6,8 +6,11 @@ import {
   IconHelpCircle,
   IconPointFilled,
   IconLayoutList,
+  IconSun,
+  IconMoon,
 } from '@tabler/icons-react'
 import { useWindowWidth } from '../hooks/useWindowWidth'
+import { useTheme } from '../context/ThemeContext'
 
 const NAV_ITEMS = [
   { to: '/settings', icon: IconSettings, label: 'Settings' },
@@ -21,6 +24,8 @@ export default function Sidebar({ isActive = true, plan = 'Free' }) {
   const width = useWindowWidth()
   const collapsed = width > 0 && width < 600
   const hidden = width > 0 && width < 400
+  const { theme, toggle } = useTheme()
+  const isDark = theme === 'dark'
 
   if (hidden) return null
 
@@ -37,25 +42,26 @@ export default function Sidebar({ isActive = true, plan = 'Free' }) {
     >
       {/* Logo */}
       <div
-        className="flex items-center py-4"
         style={{
+          display: 'flex',
+          alignItems: 'center',
           borderBottom: '1px solid var(--border)',
-          padding: collapsed ? '14px 12px' : '14px 16px',
+          padding: collapsed ? '12px' : '12px 12px 12px 14px',
           gap: collapsed ? 0 : 8,
           justifyContent: collapsed ? 'center' : 'flex-start',
         }}
       >
         <WizLogo />
         {!collapsed && (
-          <div className="flex-1 min-w-0">
-            <span className="block font-medium text-sm" style={{ color: 'var(--text-primary)' }}>
-              WizClone
-            </span>
-            <span className="flex items-center gap-1 text-xs" style={{ color: isActive ? 'var(--success)' : 'var(--text-muted)' }}>
-              <IconPointFilled size={8} />
-              {isActive ? 'Active' : 'Paused'}
-            </span>
-          </div>
+          <>
+            <div className="flex-1 min-w-0">
+              <span className="block font-medium text-sm" style={{ color: 'var(--text-primary)' }}>
+                WizClone
+              </span>
+            </div>
+            {/* Theme toggle — top-right of header */}
+            <ThemeToggleButton isDark={isDark} onToggle={toggle} />
+          </>
         )}
       </div>
 
@@ -86,10 +92,10 @@ export default function Sidebar({ isActive = true, plan = 'Free' }) {
         ))}
       </nav>
 
-      {/* Plan badge */}
-      {!collapsed && (
-        <div className="p-4" style={{ borderTop: '1px solid var(--border)' }}>
-          <div className="flex items-center justify-between">
+      {/* Footer: plan badge only */}
+      <div style={{ borderTop: '1px solid var(--border)', padding: collapsed ? '12px 0' : '10px 14px' }}>
+        {!collapsed ? (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
             <span
               className="text-xs font-medium px-2 py-1 rounded"
               style={{
@@ -105,22 +111,52 @@ export default function Sidebar({ isActive = true, plan = 'Free' }) {
               </a>
             )}
           </div>
-        </div>
-      )}
-
-      {/* Collapsed — dot indicator only */}
-      {collapsed && (
-        <div className="flex justify-center py-4" style={{ borderTop: '1px solid var(--border)' }}>
-          <span
-            title={`Plan: ${plan}`}
-            style={{
-              width: 8, height: 8, borderRadius: '50%',
-              backgroundColor: plan === 'Free' ? 'var(--text-muted)' : 'var(--accent)',
-            }}
-          />
-        </div>
-      )}
+        ) : (
+          /* Collapsed: dot + theme toggle icon stacked */
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+            <span
+              title={`Plan: ${plan}`}
+              style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: plan === 'Free' ? 'var(--text-muted)' : 'var(--accent)' }}
+            />
+            <ThemeToggleButton isDark={isDark} onToggle={toggle} />
+          </div>
+        )}
+      </div>
     </aside>
+  )
+}
+
+function ThemeToggleButton({ isDark, onToggle }) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: 28,
+        height: 28,
+        borderRadius: 6,
+        border: '1px solid var(--border)',
+        backgroundColor: 'transparent',
+        color: 'var(--text-muted)',
+        cursor: 'pointer',
+        flexShrink: 0,
+        transition: 'background-color 120ms, color 120ms',
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.backgroundColor = 'var(--bg-secondary)'
+        e.currentTarget.style.color = 'var(--text-primary)'
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.backgroundColor = 'transparent'
+        e.currentTarget.style.color = 'var(--text-muted)'
+      }}
+    >
+      {isDark ? <IconSun size={14} /> : <IconMoon size={14} />}
+    </button>
   )
 }
 

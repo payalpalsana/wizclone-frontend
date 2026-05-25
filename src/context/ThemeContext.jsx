@@ -1,36 +1,57 @@
-import { createContext, useContext, useEffect, useState } from 'react'
-import { listenToTheme } from '../lib/monday'
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
+import { listenToTheme } from "../lib/monday";
 
-const ThemeContext = createContext('light')
+const STORAGE_KEY = "wizclone-theme";
+
+const ThemeContext = createContext({ theme: "light", toggle: () => {} });
 
 export function ThemeProvider({ children }) {
-  const [theme, setTheme] = useState('light')
+  const [theme, setTheme] = useState(() => {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored === "dark" || stored === "light") return stored;
+    return window.matchMedia("(prefers-color-scheme: dark)").matches
+      ? "dark"
+      : "light";
+  });
 
   useEffect(() => {
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-    if (prefersDark) setTheme('dark')
-
     try {
       listenToTheme((res) => {
-        if (res?.data?.theme === 'dark' || res?.data?.theme === 'black') {
-          setTheme('dark')
-        } else {
-          setTheme('light')
-        }
-      })
-    } catch (_) {}
-  }, [])
+        if (localStorage.getItem(STORAGE_KEY)) return;
+        const mondayDark =
+          res?.data?.theme === "dark" || res?.data?.theme === "black";
+        setTheme(mondayDark ? "dark" : "light");
+      });
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
 
   useEffect(() => {
-    const root = document.documentElement
-    if (theme === 'dark') {
-      root.classList.add('dark')
-    } else {
-      root.classList.remove('dark')
-    }
-  }, [theme])
+    const root = document.documentElement;
+    if (theme === "dark") root.classList.add("dark");
+    else root.classList.remove("dark");
+  }, [theme]);
 
-  return <ThemeContext.Provider value={theme}>{children}</ThemeContext.Provider>
+  const toggle = useCallback(() => {
+    setTheme((prev) => {
+      const next = prev === "dark" ? "light" : "dark";
+      localStorage.setItem(STORAGE_KEY, next);
+      return next;
+    });
+  }, []);
+
+  return (
+    <ThemeContext.Provider value={{ theme, toggle }}>
+      {children}
+    </ThemeContext.Provider>
+  );
 }
 
-export const useTheme = () => useContext(ThemeContext)
+export const useTheme = () => useContext(ThemeContext);

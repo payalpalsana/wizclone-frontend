@@ -3,35 +3,56 @@ import mondaySdk from 'monday-sdk-js'
 const monday = mondaySdk()
 
 export const initMonday = () => {
-  monday.setApiVersion('2024-01')
+  const res = monday.setApiVersion('2024-01')
+  console.log('initMonday called, response:', res)
+  return res
 }
 
-export const getContext = () => monday.get('context')
+export const getContext = () => {
+  const res = monday.get('context')
+  console.log('getContext called, response:', res)
+  return res
+}
 
-export const getSessionToken = () => monday.get('sessionToken')
+export const getSessionToken = () => {
+  const res = monday.get('sessionToken')
+  console.log('getSessionToken called, response:', res)
+  return res
+}
 
 export const listenToContext = (callback) => {
-  monday.listen('context', callback)
+  const res = monday.listen('context', callback)
+  console.log('listenToContext called, response:', res)
+  return res
 }
 
 export const listenToTheme = (callback) => {
-  monday.listen('theme', callback)
+  const res = monday.listen('theme', callback)
+  console.log('listenToTheme called, response:', res)
+  return res
 }
 
 export const openItem = (itemId) => {
-  monday.execute('openItemCard', { itemId })
+  const res = monday.execute('openItemCard', { itemId })
+  console.log('openItem called, response:', res)
+  return res
 }
 
 export const openLinkInTab = (url) => {
-  monday.execute('openLinkInTab', { url })
+  const res = monday.execute('openLinkInTab', { url })
+  console.log('openLinkInTab called, response:', res)
+  return res
 }
 
 export const showConfirmation = (message) => {
-  return monday.execute('confirm', { message })
+  const res = monday.execute('confirm', { message })
+  console.log('showConfirmation called, response:', res)
+  return res
 }
 
 export const queryMonday = async (query, variables = {}) => {
   const res = await monday.api(query, { variables })
+  console.log('queryMonday called, response:', res)
   if (res.errors) throw new Error(res.errors[0]?.message || 'monday.com API error')
   return res.data
 }
@@ -45,6 +66,7 @@ export const fetchBoards = async () => {
       }
     }
   `)
+  console.log('fetchBoards called, response:', data)
   return data.boards
 }
 
@@ -65,6 +87,7 @@ export const fetchBoardItems = async (boardId) => {
       }
     }
   `, { boardId })
+  console.log('fetchBoardItems called, response:', data)
   return data.boards?.[0]?.items_page?.items ?? []
 }
 
@@ -77,6 +100,7 @@ export const createSubitem = async (parentItemId, itemName) => {
       }
     }
   `, { parentItemId, itemName })
+  console.log('createSubitem called, response:', data)
   return data.create_subitem
 }
 

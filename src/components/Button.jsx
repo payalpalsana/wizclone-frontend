@@ -12,7 +12,7 @@ export default function Button({
   fullWidth = false,
   style = {},
 }) {
-  const base = `inline-flex items-center justify-center gap-2 font-medium rounded-lg transition-colors duration-120 cursor-pointer select-none border`
+  const base = `inline-flex items-center justify-center gap-2 font-medium rounded-md transition-colors duration-120 cursor-pointer select-none border`
   const sizeMap = {
     sm: 'text-xs px-3',
     md: 'text-sm px-3',

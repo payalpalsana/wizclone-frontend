@@ -1,23 +1,26 @@
-import { useState } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
-import AppLayout from './components/AppLayout'
-import Onboard from './screens/Onboard'
-import Settings from './screens/Settings'
-import ActivityLog from './screens/ActivityLog'
-import Templates from './screens/Templates'
-import TemplateBuilder from './screens/TemplateBuilder'
-import Help from './screens/Help'
-import UpgradeModal from './components/UpgradeModal'
+import { useState } from "react";
+import { Routes, Route, Navigate } from "react-router-dom";
+import AppLayout from "./components/AppLayout";
+import Onboard from "./pages/Onboard";
+import Settings from "./pages/Settings";
+import ActivityLog from "./pages/ActivityLog";
+import Templates from "./pages/Templates";
+import TemplateBuilder from "./pages/TemplateBuilder";
+import Help from "./pages/Help";
+import UpgradeModal from "./components/UpgradeModal";
 
 export default function App() {
-  const [upgradeOpen, setUpgradeOpen] = useState(false)
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
 
   return (
     <>
       <Routes>
         <Route path="/onboard" element={<Onboard />} />
         <Route element={<AppLayout isActive={true} plan="Free" />}>
-          <Route path="/settings" element={<Settings onUpgrade={() => setUpgradeOpen(true)} />} />
+          <Route
+            path="/settings"
+            element={<Settings onUpgrade={() => setUpgradeOpen(true)} />}
+          />
           <Route path="/templates" element={<Templates />} />
           <Route path="/activity" element={<ActivityLog />} />
           <Route path="/builder" element={<TemplateBuilder />} />
@@ -25,7 +28,10 @@ export default function App() {
         </Route>
         <Route path="*" element={<Navigate to="/settings" replace />} />
       </Routes>
-      <UpgradeModal isOpen={upgradeOpen} onClose={() => setUpgradeOpen(false)} />
+      <UpgradeModal
+        isOpen={upgradeOpen}
+        onClose={() => setUpgradeOpen(false)}
+      />
     </>
-  )
+  );
 }
