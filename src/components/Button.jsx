@@ -23,7 +23,7 @@ export default function Button({
   const variantStyles = {
     primary: {
       backgroundColor: disabled || loading ? 'var(--accent)' : 'var(--accent)',
-      color: '#fff',
+      color: 'var(--text-color)',
       borderColor: 'transparent',
       opacity: disabled || loading ? 0.7 : 1,
     },

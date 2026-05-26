@@ -60,7 +60,7 @@ export const queryMonday = async (query, variables = {}) => {
 export const fetchBoards = async () => {
   const data = await queryMonday(`
     query {
-      boards(limit: 100, order_by: created_at) {
+      boards(limit: 100) {
         id
         name
       }

@@ -44,7 +44,6 @@ export default function AppLayout({ isActive, plan }) {
         <Outlet />
       </main>
 
-      {/* Mobile bottom nav — only < 400px */}
       {mobileNav && (
         <nav
           style={{
@@ -81,7 +80,6 @@ export default function AppLayout({ isActive, plan }) {
             </NavLink>
           ))}
 
-          {/* Theme toggle — last slot in bottom nav */}
           <button
             type="button"
             onClick={toggle}

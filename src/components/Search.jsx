@@ -1,5 +1,4 @@
 import { IconSearch } from "@tabler/icons-react";
-import React from "react";
 
 const Search = ({ search, setSearch, isMobile, placeholder }) => {
   return (

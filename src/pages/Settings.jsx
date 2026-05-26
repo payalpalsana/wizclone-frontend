@@ -11,6 +11,7 @@ import { fetchBoards, fetchBoardItems } from "../lib/monday";
 import TemplateSuggestionBanner from "../components/TemplateSuggestionBanner";
 import { useWindowWidth } from "../hooks/useWindowWidth";
 import { SENSITIVITY_OPTIONS } from "../utils/constant";
+import Button from "../components/Button";
 
 export default function Settings() {
   const toast = useToast();
@@ -240,7 +241,7 @@ export default function Settings() {
                         top: -8,
                         right: 8,
                         backgroundColor: "var(--accent)",
-                        color: "#fff",
+                        color: "var(--text-color)",
                         fontSize: 10,
                         fontWeight: 600,
                         padding: "2px 6px",
@@ -348,27 +349,7 @@ export default function Settings() {
           zIndex: 40,
         }}
       >
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={saveState === "saving"}
-          style={{
-            height: 34,
-            paddingInline: 16,
-            borderRadius: 6,
-            backgroundColor: "var(--accent)",
-            color: "#fff",
-            fontSize: 14,
-            fontWeight: 500,
-            border: "none",
-            cursor: saveState === "saving" ? "not-allowed" : "pointer",
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            fontFamily: "inherit",
-            opacity: saveState === "saving" ? 0.8 : 1,
-          }}
-        >
+        <Button onClick={handleSave} disabled={saveState === "saving"}>
           {saveState === "saving" && (
             <IconLoader2 size={14} className="animate-spin" />
           )}
@@ -378,7 +359,7 @@ export default function Settings() {
             : saveState === "saved"
               ? "Saved"
               : "Save settings"}
-        </button>
+        </Button>
       </div>
     </motion.div>
   );

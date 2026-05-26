@@ -28,7 +28,7 @@ export default function Toggle({ checked, onChange, disabled = false }) {
           width: 16,
           height: 16,
           borderRadius: '50%',
-          backgroundColor: '#fff',
+          backgroundColor: checked ? 'var(--accent-light)' : '#fff',
           transition: 'left 200ms',
           boxShadow: '0 1px 3px rgba(0,0,0,0.15)',
         }}

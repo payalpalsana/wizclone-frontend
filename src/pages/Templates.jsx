@@ -27,7 +27,6 @@ import {
   IconTrash,
   IconCheck,
   IconLoader2,
-  IconSearch,
 } from "@tabler/icons-react";
 import EmptyState from "../components/EmptyState";
 import Badge from "../components/Badge";

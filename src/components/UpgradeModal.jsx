@@ -168,7 +168,7 @@ export default function UpgradeModal({ isOpen, onClose, currentPlan = 'free', us
                           left: '50%',
                           transform: 'translateX(-50%)',
                           backgroundColor: 'var(--accent)',
-                          color: '#fff',
+                          color: 'var(--text-color)',
                           fontSize: 9,
                           fontWeight: 600,
                           padding: '2px 6px',
