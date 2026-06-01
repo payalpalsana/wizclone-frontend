@@ -1,107 +1,187 @@
-import mondaySdk from 'monday-sdk-js'
+import mondaySdk from "monday-sdk-js";
+import { settingsApi } from "../api/client";
 
-const monday = mondaySdk()
+const monday = mondaySdk();
 
 export const initMonday = () => {
-  const res = monday.setApiVersion('2024-01')
-  console.log('initMonday called, response:', res)
-  return res
-}
+  monday.setApiVersion("2024-01");
+  console.log("Monday SDK initialized");
+};
 
-export const getContext = () => {
-  const res = monday.get('context')
-  console.log('getContext called, response:', res)
-  return res
-}
+export const getContext = async () => {
+  const context = await monday.get("context");
+  console.log("Context:", context);
+  return context;
+};
 
-export const getSessionToken = () => {
-  const res = monday.get('sessionToken')
-  console.log('getSessionToken called, response:', res)
-  return res
-}
+export const getSessionToken = async () => {
+  try {
+    const res = await monday.get("sessionToken");
+    return res.data;
+  } catch (err) {
+    console.error("Failed to get session token", err);
+    throw err;
+  }
+};
 
 export const listenToContext = (callback) => {
-  const res = monday.listen('context', callback)
-  console.log('listenToContext called, response:', res)
-  return res
-}
+  return monday.listen("context", callback);
+};
 
 export const listenToTheme = (callback) => {
-  const res = monday.listen('theme', callback)
-  console.log('listenToTheme called, response:', res)
-  return res
-}
+  return monday.listen("theme", callback);
+};
 
 export const openItem = (itemId) => {
-  const res = monday.execute('openItemCard', { itemId })
-  console.log('openItem called, response:', res)
-  return res
-}
+  return monday.execute("openItemCard", { itemId });
+};
 
 export const openLinkInTab = (url) => {
-  const res = monday.execute('openLinkInTab', { url })
-  console.log('openLinkInTab called, response:', res)
-  return res
-}
+  return monday.execute("openLinkInTab", { url });
+};
 
 export const showConfirmation = (message) => {
-  const res = monday.execute('confirm', { message })
-  console.log('showConfirmation called, response:', res)
-  return res
-}
+  return monday.execute("confirm", { message });
+};
 
 export const queryMonday = async (query, variables = {}) => {
-  const res = await monday.api(query, { variables })
-  console.log('queryMonday called, response:', res)
-  if (res.errors) throw new Error(res.errors[0]?.message || 'monday.com API error')
-  return res.data
-}
+  const res = await monday.api(query, { variables });
 
+  if (res.errors?.length) {
+    throw new Error(res.errors[0].message);
+  }
+
+  return res.data;
+};
+
+/**
+ * Returns the current workspace id from context.
+ */
+export const getWorkspaceId = async () => {
+  const context = await getContext();
+
+  const workspaceId = context?.data?.workspaceId ?? context?.data?.workspace_id;
+
+  if (!workspaceId) {
+    throw new Error(
+      "Workspace ID not found in monday context. Ensure the app is running as a Workspace App.",
+    );
+  }
+
+  return workspaceId;
+};
+
+/**
+ * Fetch boards belonging ONLY to the current workspace.
+ */
 export const fetchBoards = async () => {
-  const data = await queryMonday(`
-    query {
-      boards(limit: 100) {
+  console.log("fetchBoards called");
+  const workspaceId = await getWorkspaceId();
+  console.log('workspaceId: ', workspaceId);
+
+  const data = await queryMonday(
+    `
+    query ($workspaceId: ID!) {
+      boards(workspace_ids: [$workspaceId]) {
         id
         name
       }
     }
-  `)
-  console.log('fetchBoards called, response:', data)
-  return data.boards
-}
+    `,
+    { workspaceId },
+  );
+  console.log("Fetched boards:", data.boards);
+  return data.boards ?? [];
+};
 
-export const fetchBoardItems = async (boardId) => {
-  const data = await queryMonday(`
-    query($boardId: ID!) {
-      boards(ids: [$boardId]) {
-        items_page(limit: 50) {
-          items {
-            id
-            name
-            subitems {
-              id
-              name
-            }
-          }
-        }
-      }
-    }
-  `, { boardId })
-  console.log('fetchBoardItems called, response:', data)
-  return data.boards?.[0]?.items_page?.items ?? []
-}
+// export const fetchBoardItems = async (boardId) => {
+//   const data = await queryMonday(
+//     `
+//     query ($boardId: ID!) {
+//       boards(ids: [$boardId]) {
+//         items_page(limit: 50) {
+//           items {
+//             id
+//             name
+//             subitems {
+//               id
+//               name
+//             }
+//           }
+//         }
+//       }
+//     }
+//     `,
+//     { boardId },
+//   );
 
-export const createSubitem = async (parentItemId, itemName) => {
-  const data = await queryMonday(`
-    mutation($parentItemId: ID!, $itemName: String!) {
-      create_subitem(parent_item_id: $parentItemId, item_name: $itemName) {
-        id
-        name
-      }
-    }
-  `, { parentItemId, itemName })
-  console.log('createSubitem called, response:', data)
-  return data.create_subitem
-}
+//   return data.boards?.[0]?.items_page?.items ?? [];
+// };
 
-export default monday
+// export const createSubitem = async (parentItemId, itemName) => {
+//   const data = await queryMonday(
+//     `
+//     mutation ($parentItemId: ID!, $itemName: String!) {
+//       create_subitem(
+//         parent_item_id: $parentItemId
+//         item_name: $itemName
+//       ) {
+//         id
+//         name
+//       }
+//     }
+//     `,
+//     { parentItemId, itemName },
+//   );
+
+//   return data.create_subitem;
+// };
+
+export const fetchAutomationBoards = async (workspaceId) => {
+  const res = await settingsApi.get(workspaceId);
+  return res.boards ?? [];
+};
+
+export const addAutomationBoard = async (
+  workspaceId,
+  board,
+  currentSettings,
+) => {
+  const updatedBoards = [
+    ...currentSettings.boards,
+    { id: board.id, name: board.name, user_enabled: false },
+  ];
+  return settingsApi.save(workspaceId, {
+    ...currentSettings,
+    boards: updatedBoards,
+  });
+};
+
+export const updateAutomationBoard = async (
+  workspaceId,
+  boardId,
+  enabled,
+  currentSettings,
+) => {
+  const updatedBoards = currentSettings.boards.map((b) =>
+    b.id === boardId ? { ...b, user_enabled: enabled } : b,
+  );
+  return settingsApi.save(workspaceId, {
+    ...currentSettings,
+    boards: updatedBoards,
+  });
+};
+
+export const removeAutomationBoard = async (
+  workspaceId,
+  boardId,
+  currentSettings,
+) => {
+  const updatedBoards = currentSettings.boards.filter((b) => b.id !== boardId);
+  return settingsApi.save(workspaceId, {
+    ...currentSettings,
+    boards: updatedBoards,
+  });
+};
+
+export default monday;

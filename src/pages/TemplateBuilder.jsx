@@ -12,13 +12,9 @@ import {
   arrayMove,
   SortableContext,
   sortableKeyboardCoordinates,
-  useSortable,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
 import {
-  IconGripVertical,
-  IconX,
   IconPlus,
   IconLoader2,
   IconCheck,
@@ -29,95 +25,9 @@ import { SectionLabel } from "../components/Card";
 import { BuilderIllustration } from "../components/EmptyState";
 import { useWindowWidth } from "../hooks/useWindowWidth";
 import Button from "../components/Button";
+import SortableSubitemRow from "../components/SortableSubitemRow";
 
 let _subId = 0;
-
-function SortableSubitem({ item, onEdit, onDelete }) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: item.id });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-  };
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className="flex items-center gap-2 group"
-    >
-      <button
-        {...attributes}
-        {...listeners}
-        type="button"
-        style={{
-          cursor: "grab",
-          color: "var(--text-muted)",
-          border: "none",
-          background: "none",
-          padding: "0 2px",
-          display: "flex",
-          alignItems: "center",
-          flexShrink: 0,
-        }}
-      >
-        <IconGripVertical size={14} />
-      </button>
-      <input
-        type="text"
-        value={item.name}
-        onChange={(e) => onEdit(item.id, e.target.value)}
-        style={{
-          flex: 1,
-          height: 36,
-          fontSize: 14,
-          border: "1px solid var(--border)",
-          borderRadius: 8,
-          padding: "0 12px",
-          backgroundColor: "var(--bg-primary)",
-          color: "var(--text-primary)",
-          outline: "none",
-          fontFamily: "inherit",
-          transition: "border-color 120ms, box-shadow 120ms",
-        }}
-        onFocus={(e) => {
-          e.target.style.borderColor = "var(--accent)";
-          e.target.style.boxShadow = "0 0 0 3px rgba(108,71,255,0.12)";
-        }}
-        onBlur={(e) => {
-          e.target.style.borderColor = "var(--border)";
-          e.target.style.boxShadow = "none";
-        }}
-      />
-      <button
-        type="button"
-        onClick={() => onDelete(item.id)}
-        className="opacity-0 group-hover:opacity-100"
-        style={{
-          color: "var(--text-muted)",
-          border: "none",
-          background: "none",
-          cursor: "pointer",
-          padding: "0 2px",
-          display: "flex",
-          alignItems: "center",
-          flexShrink: 0,
-          transition: "opacity 120ms",
-        }}
-      >
-        <IconX size={14} />
-      </button>
-    </div>
-  );
-}
 
 const MOCK_SUBITEMS = [
   "Define target audience and goals",
@@ -350,7 +260,7 @@ export default function TemplateBuilder() {
                 >
                   <div className="flex flex-col gap-2 mb-3">
                     {subitems.map((item) => (
-                      <SortableSubitem
+                      <SortableSubitemRow
                         key={item.id}
                         item={item}
                         onEdit={editSubitem}
