@@ -1,24 +1,30 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { IconLock, IconLoader2 } from "@tabler/icons-react";
 import { useWindowWidth } from "../hooks/useWindowWidth";
 import { WizLogo } from "../utils/icon";
+import { authApi } from "../api/client";
 
 export default function Onboard() {
-  const [status, setStatus] = useState("idle");
-  const navigate = useNavigate();
+  const [status, setStatus] = useState("idle"); // idle | loading | error
   const width = useWindowWidth();
   const isMobile = width > 0 && width < 480;
 
-  const handleConnect = async () => {
-    setStatus("loading");
-    try {
-      await new Promise((r) => setTimeout(r, 1500));
-      navigate("/settings");
-    } catch {
-      setStatus("error");
-    }
+  const handleConnect = () => {
+    authApi
+      .connect()
+      .then((res) => {
+        console.log("res: ", res);
+        if (res?.authorization_url) {
+          window.location.href = res.authorization_url;
+        } else {
+          throw new Error("Invalid response from server");
+        }
+      })
+      .catch((err) => {
+        console.error("Connection error:", err);
+        setStatus("error");
+      });
   };
 
   return (
@@ -39,7 +45,6 @@ export default function Onboard() {
           </div>
 
           <h1
-            className="mb-3"
             style={{
               fontSize: 20,
               fontWeight: 500,
@@ -71,8 +76,7 @@ export default function Onboard() {
               width: "100%",
               height: 40,
               borderRadius: 8,
-              backgroundColor:
-                status === "loading" ? "var(--accent)" : "var(--accent)",
+              backgroundColor: "var(--accent)",
               color: "#fff",
               fontSize: 14,
               fontWeight: 500,
@@ -98,7 +102,9 @@ export default function Onboard() {
             {status === "loading" && (
               <IconLoader2 size={16} className="animate-spin" />
             )}
-            {status === "loading" ? "Connecting..." : "Connect with monday.com"}
+            {status === "loading"
+              ? "Redirecting..."
+              : "Connect with monday.com"}
           </button>
 
           {status === "error" && (

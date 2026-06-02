@@ -27,6 +27,14 @@ client.interceptors.response.use(
   },
 );
 
+export const verifyApi = {
+  init: (payload) => client.post("/auth/verify", payload),
+};
+
+export const authApi = {
+  connect: (payload) => client.get("/auth/authorization", payload),
+};
+
 export const settingsApi = {
   get: (workspaceId) => client.get(`/settings/${workspaceId}`),
   save: (workspaceId, data) => client.post(`/settings/${workspaceId}`, data),
