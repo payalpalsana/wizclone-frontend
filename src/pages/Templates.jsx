@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useWindowWidth } from "../hooks/useWindowWidth";
 import { IconPlus } from "@tabler/icons-react";
 import EmptyState from "../components/EmptyState";
@@ -8,71 +9,100 @@ import { NoTemplatesIcon } from "../utils/icon";
 import Search from "../components/Search";
 import CreateTemplateModal from "../components/CreateTemplateModal";
 import TemplateCard from "../components/TemplateCard";
+import { SkeletonCard } from "../components/Skeleton";
+import { useToast } from "../context/ToastContext";
+import { useWorkspace } from "../context/WorkspaceContext";
+import { templateApi } from "../api/client";
 
-// --- Mock data ---
-const INITIAL_TEMPLATES = [
-  {
-    id: 1,
-    name: "New Client Onboarding",
-    subitems: [
-      { id: 10, name: "Send welcome email" },
-      { id: 11, name: "Schedule kickoff call" },
-      { id: 12, name: "Review proposal" },
-      { id: 13, name: "Set up access & tools" },
-      { id: 14, name: "Assign account owner" },
-    ],
-    createdAt: new Date(Date.now() - 86400000 * 5),
-    copies: 14,
-  },
-  {
-    id: 2,
-    name: "Social Media Campaign",
-    subitems: [
-      { id: 20, name: "Define target audience" },
-      { id: 21, name: "Create content calendar" },
-      { id: 22, name: "Design visual assets" },
-      { id: 23, name: "Write copy for all platforms" },
-      { id: 24, name: "Schedule and publish posts" },
-      { id: 25, name: "Monitor engagement and analytics" },
-    ],
-    createdAt: new Date(Date.now() - 86400000 * 2),
-    copies: 7,
-  },
-  {
-    id: 3,
-    name: "Product Launch Checklist",
-    subitems: [
-      { id: 30, name: "Finalize feature list" },
-      { id: 31, name: "QA sign-off" },
-      { id: 32, name: "Prepare launch announcement" },
-      { id: 33, name: "Coordinate with sales team" },
-      { id: 34, name: "Post-launch monitoring" },
-    ],
-    createdAt: new Date(Date.now() - 86400000 * 10),
-    copies: 3,
-  },
-];
+// Normalise server shape → component shape
+function normalize(t) {
+  return {
+    id:        t.id,
+    name:      t.name,
+    subitems:  t.subitems ?? [],   // [{ id, name, sort_order }]
+    createdAt: new Date(t.created_at),
+    copies:    t.usage_count ?? 0,
+  };
+}
 
 export default function Templates() {
-  const width = useWindowWidth();
-  const isMobile = width > 0 && width < 600;
+  const width      = useWindowWidth();
+  const isMobile   = width > 0 && width < 600;
+  const toast      = useToast();
+  const queryClient = useQueryClient();
+  const { workspaceId, accountId } = useWorkspace();
 
-  const [templates, setTemplates] = useState(INITIAL_TEMPLATES);
   const [search, setSearch] = useState("");
-  const [open, setOpen] = useState(false);
+  const [open,   setOpen]   = useState(false);
 
-  const filtered = templates.filter((t) =>
+  // Use accountId as path param if workspaceId is not yet set
+  // Backend resolves workspace via account_id from the session token anyway
+  const queryId = workspaceId || accountId;
+
+  console.log("[Templates] workspaceId:", workspaceId, "accountId:", accountId, "queryId:", queryId);
+
+  // ── Fetch templates ──
+  const { data: raw, isLoading, isError } = useQuery({
+    queryKey: ["templates", queryId],
+    queryFn:  () => templateApi.list(queryId),
+    enabled:  !!queryId,
+    retry:    false,
+    staleTime: 0,
+  });
+
+  const templates = (raw?.templates ?? []).map(normalize);
+  const filtered  = templates.filter((t) =>
     t.name.toLowerCase().includes(search.toLowerCase()),
   );
 
-  const handleUpdate = (updated) => {
-    setTemplates((prev) =>
-      prev.map((t) => (t.id === updated.id ? updated : t)),
-    );
+  // ── Create ──
+  const createMutation = useMutation({
+    mutationFn: (payload) => templateApi.create(queryId, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["templates", queryId] });
+      toast.success("Template created");
+      setOpen(false);
+    },
+    onError: () => toast.error("Failed to create template"),
+  });
+
+  // ── Update ──
+  const updateMutation = useMutation({
+    mutationFn: ({ templateId, payload }) =>
+      templateApi.update(queryId, templateId, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["templates", queryId] });
+      toast.success("Template updated");
+    },
+    onError: () => toast.error("Failed to update template"),
+  });
+
+  // ── Delete ──
+  const deleteMutation = useMutation({
+    mutationFn: (templateId) => templateApi.remove(queryId, templateId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["templates", queryId] });
+      toast.success("Template deleted");
+    },
+    onError: () => toast.error("Failed to delete template"),
+  });
+
+  const handleCreate = (payload) => {
+    if (!payload.name?.trim()) return;
+    createMutation.mutate({
+      name:     payload.name.trim(),
+      subitems: payload.subitems
+        .filter((s) => s.name.trim())
+        .map((s, idx) => ({ name: s.name.trim(), sort_order: idx })),
+    });
   };
 
-  const handleDelete = (id) => {
-    setTemplates((prev) => prev.filter((t) => t.id !== id));
+  const handleUpdate = async (templateId, payload) => {
+    await updateMutation.mutateAsync({ templateId, payload });
+  };
+
+  const handleDelete = (templateId) => {
+    deleteMutation.mutate(templateId);
   };
 
   return (
@@ -104,19 +134,11 @@ export default function Templates() {
           >
             Templates
           </h1>
-          <p
-            style={{ fontSize: 14, color: "var(--text-secondary)", margin: 0 }}
-          >
+          <p style={{ fontSize: 14, color: "var(--text-secondary)", margin: 0 }}>
             All subitem templates that WizClone uses for matching.
           </p>
         </div>
-        <Button
-          variant="primary"
-          type="button"
-          onClick={() => {
-            setOpen(true);
-          }}
-        >
+        <Button variant="primary" type="button" onClick={() => setOpen(true)}>
           <IconPlus size={14} />
           New template
         </Button>
@@ -136,26 +158,40 @@ export default function Templates() {
           search={search}
           setSearch={setSearch}
           isMobile={isMobile}
-          placeholder={"Search templates..."}
+          placeholder="Search templates..."
         />
-        <span
-          className="text-sm shrink-0"
-          style={{ color: "var(--text-muted)" }}
-        >
-          {filtered.length} template{filtered.length !== 1 ? "s" : ""}
+        <span className="text-sm shrink-0" style={{ color: "var(--text-muted)" }}>
+          {isLoading ? "—" : `${filtered.length} template${filtered.length !== 1 ? "s" : ""}`}
         </span>
       </div>
 
-      {filtered.length === 0 ? (
+      {/* Loading */}
+      {isLoading && (
+        <div className="flex flex-col gap-3">
+          <SkeletonCard />
+          <SkeletonCard />
+          <SkeletonCard />
+        </div>
+      )}
+
+      {/* Error */}
+      {isError && !isLoading && (
         <EmptyState
           illustration={<NoTemplatesIcon />}
-          heading={
-            search ? "No templates match your search" : "No templates yet"
-          }
+          heading="Failed to load templates"
+          subtext="Could not reach the server. Please refresh the page."
+        />
+      )}
+
+      {/* Empty */}
+      {!isLoading && !isError && filtered.length === 0 && (
+        <EmptyState
+          illustration={<NoTemplatesIcon />}
+          heading={search ? "No templates match your search" : "No templates yet"}
           subtext={
             search
               ? "Try a different search term."
-              : "Create your first template using the Template Builder to get started."
+              : "Create your first template to get started."
           }
           action={
             !search && (
@@ -166,25 +202,28 @@ export default function Templates() {
             )
           }
         />
-      ) : (
+      )}
+
+      {/* List */}
+      {!isLoading && !isError && filtered.length > 0 && (
         <div className="flex flex-col gap-3">
           {filtered.map((t) => (
             <TemplateCard
-              // itemId={_itemId}
               key={t.id}
               template={t}
               onUpdate={handleUpdate}
               onDelete={handleDelete}
+              isDeleting={deleteMutation.isPending && deleteMutation.variables === t.id}
             />
           ))}
         </div>
       )}
+
       <CreateTemplateModal
         open={open}
         onClose={() => setOpen(false)}
-        onSubmit={(payload) => {
-          // Handle template creation
-        }}
+        onSubmit={handleCreate}
+        isSubmitting={createMutation.isPending}
       />
     </motion.div>
   );

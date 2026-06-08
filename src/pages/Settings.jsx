@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   IconCheck,
   IconLoader2,
@@ -12,13 +12,7 @@ import Select from "../components/Select";
 import Toggle from "../components/Toggle";
 import { SkeletonCard } from "../components/Skeleton";
 import { useToast } from "../context/ToastContext";
-import {
-  fetchBoards,
-  fetchAutomationBoards,
-  addAutomationBoard,
-  updateAutomationBoard,
-  removeAutomationBoard,
-} from "../lib/monday";
+import { fetchBoards, fetchAutomationBoards } from "../lib/monday";
 import { useWindowWidth } from "../hooks/useWindowWidth";
 import { SENSITIVITY_OPTIONS } from "../utils/constant";
 import Button from "../components/Button";
@@ -46,68 +40,67 @@ export default function Settings() {
     retry: false,
   });
 
-  const { data: settings, isLoading: settingsLoading } = useQuery({
+  const { data: settings, isLoading: settingsLoading, isError: settingsError } = useQuery({
     queryKey: ["settings", workspaceId],
     queryFn: () => fetchAutomationBoards(workspaceId),
     enabled: !!workspaceId,
     retry: false,
-  });
-  console.log("Fetched settings:", workspaceBoards, settings);
-
-  const automationBoards = settings?.boards ?? [];
-  const [sensitivity, setSensitivity] = useState(
-    settings?.sensitivity?.toLowerCase() ?? "balanced",
-  );
-  const [automationEnabled, setAutomationEnabled] = useState(
-    settings?.automation_enabled ?? true,
-  );
-
-  const addBoardMutation = useMutation({
-    mutationFn: (board) => addAutomationBoard(workspaceId, board, settings),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["settings", workspaceId] });
-      toast.success("Board added");
-    },
-    onError: () => toast.error("Failed to add board"),
+    staleTime: 0,
   });
 
-  const updateBoardMutation = useMutation({
-    mutationFn: ({ boardId, enabled }) =>
-      updateAutomationBoard(workspaceId, boardId, enabled, settings),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["settings", workspaceId] }),
-    onError: () => toast.error("Failed to update board"),
-  });
+  // Local state — all edits live here; only flushed to API on Save
+  const [automationBoards, setAutomationBoards] = useState([]);
+  const [sensitivity, setSensitivity]           = useState("balanced");
+  const [automationEnabled, setAutomationEnabled] = useState(true);
+  const [settingsSynced, setSettingsSynced]       = useState(false);
 
-  const removeBoardMutation = useMutation({
-    mutationFn: (boardId) =>
-      removeAutomationBoard(workspaceId, boardId, settings),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["settings", workspaceId] });
-      toast.success("Board removed");
-    },
-    onError: () => toast.error("Failed to remove board"),
-  });
+  // Reset sync flag whenever workspace changes
+  useEffect(() => { setSettingsSynced(false); }, [workspaceId]);
 
+  // Sync from server once per load (doesn't overwrite local edits on re-render)
+  useEffect(() => {
+    if (settings && !settingsSynced) {
+      setAutomationBoards(settings.boards ?? []);
+      setSensitivity(settings.sensitivity?.toLowerCase() ?? "balanced");
+      setAutomationEnabled(settings.automation_enabled ?? true);
+      setSettingsSynced(true);
+    }
+  }, [settings, settingsSynced]);
+
+  // ── Board operations (local state only — no API call) ──
   const handleBoardSelect = (boardId) => {
-    const alreadyAdded = automationBoards.some((b) => b.id === boardId);
-    if (alreadyAdded) {
+    if (automationBoards.some((b) => String(b.board_id) === String(boardId))) {
       toast.error("Board already added");
       return;
     }
-    const board = workspaceBoards.find((b) => b.id === boardId);
+    const board = workspaceBoards.find((b) => String(b.id) === String(boardId));
     if (!board) return;
-    addBoardMutation.mutate(board);
+    setAutomationBoards((prev) => [
+      ...prev,
+      { board_id: parseInt(board.id), board_name: board.name, board_enabled: true },
+    ]);
+  };
+
+  const handleToggleBoard = (boardId, enabled) => {
+    setAutomationBoards((prev) =>
+      prev.map((b) => String(b.board_id) === String(boardId) ? { ...b, board_enabled: enabled } : b)
+    );
+  };
+
+  const handleRemoveBoard = (boardId) => {
+    setAutomationBoards((prev) => prev.filter((b) => String(b.board_id) !== String(boardId)));
   };
 
   const handleSave = async () => {
     setSaveState("saving");
     try {
       await settingsApi.save(workspaceId, {
-        ...settings,
         sensitivity: sensitivity.toUpperCase(),
         automation_enabled: automationEnabled,
+        boards: automationBoards,
       });
+      // Re-sync from server after save so DB state is reflected
+      setSettingsSynced(false);
       queryClient.invalidateQueries({ queryKey: ["settings", workspaceId] });
       setSaveState("saved");
       toast.success("Settings saved successfully");
@@ -118,9 +111,9 @@ export default function Settings() {
     }
   };
 
-  const addedBoardIds = new Set(automationBoards.map((b) => b.id));
+  const addedBoardIds = new Set(automationBoards.map((b) => String(b.board_id)));
   const boardOptions = workspaceBoards
-    .filter((b) => !addedBoardIds.has(b.id))
+    .filter((b) => !addedBoardIds.has(String(b.id)))
     .map((b) => ({ value: b.id, label: b.name }));
 
   const sidebarW = isNarrow ? 0 : isMobile ? 52 : 200;
@@ -149,6 +142,16 @@ export default function Settings() {
           Configure how WizClone works on this board.
         </p>
       </div>
+
+      {settingsError && (
+        <div
+          className="rounded-lg px-4 py-3 mb-4 flex items-center gap-2 text-sm"
+          style={{ backgroundColor: "var(--danger-light, #fee2e2)", color: "var(--danger, #dc2626)" }}
+        >
+          <IconAlertTriangle size={15} style={{ flexShrink: 0 }} />
+          Failed to load settings. Please refresh the page.
+        </div>
+      )}
 
       <div className="flex flex-col gap-4 flex-1">
         {/* ── Template Board ── */}
@@ -187,7 +190,7 @@ export default function Settings() {
                     ? "Loading boards..."
                     : "Add a board..."
                 }
-                disabled={addBoardMutation.isPending}
+                disabled={false}
                 loading={workspaceBoardsLoading}
               />
 
@@ -218,7 +221,7 @@ export default function Settings() {
                   ) : (
                     automationBoards.map((board) => (
                       <motion.div
-                        key={board.id}
+                        key={board.board_id}
                         initial={{ opacity: 0, y: -6 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -6 }}
@@ -228,7 +231,7 @@ export default function Settings() {
                           className="rounded-lg p-3"
                           style={{
                             backgroundColor: "var(--bg-secondary)",
-                            border: board.user_enabled
+                            border: board.board_enabled
                               ? "1px solid var(--border)"
                               : "1px dashed var(--border)",
                             transition: "border 0.2s ease",
@@ -254,7 +257,7 @@ export default function Settings() {
                                   whiteSpace: "nowrap",
                                 }}
                               >
-                                {board.name}
+                                {board.board_name}
                               </p>
                               <p
                                 style={{
@@ -263,7 +266,7 @@ export default function Settings() {
                                   margin: "2px 0 0",
                                 }}
                               >
-                                {board.user_enabled
+                                {board.board_enabled
                                   ? "Template automation active"
                                   : "Automation paused"}
                               </p>
@@ -283,24 +286,16 @@ export default function Settings() {
                                   color: "var(--text-secondary)",
                                 }}
                               >
-                                {board.user_enabled ? "Enabled" : "Disabled"}
+                                {board.board_enabled ? "Enabled" : "Disabled"}
                               </span>
                               <Toggle
-                                checked={board.user_enabled}
-                                onChange={(val) =>
-                                  updateBoardMutation.mutate({
-                                    boardId: board.id,
-                                    enabled: val,
-                                  })
-                                }
-                                disabled={updateBoardMutation.isPending}
+                                checked={board.board_enabled}
+                                onChange={(val) => handleToggleBoard(board.board_id, val)}
                               />
                               <button
                                 type="button"
-                                onClick={() =>
-                                  removeBoardMutation.mutate(board.id)
-                                }
-                                disabled={removeBoardMutation.isPending}
+                                onClick={() => handleRemoveBoard(board.board_id)}
+                                disabled={false}
                                 style={{
                                   background: "none",
                                   border: "none",
@@ -327,9 +322,9 @@ export default function Settings() {
                           </div>
 
                           <AnimatePresence>
-                            {!board.user_enabled && (
+                            {!board.board_enabled && (
                               <motion.div
-                                key={`warn-${board.id}`}
+                                key={`warn-${board.board_id}`}
                                 initial={{ opacity: 0, height: 0 }}
                                 animate={{ opacity: 1, height: "auto" }}
                                 exit={{ opacity: 0, height: 0 }}
@@ -377,7 +372,7 @@ export default function Settings() {
             transition: "opacity 0.2s ease",
           }}
         >
-          <Card>
+          {settingsLoading ? <SkeletonCard /> : <Card>
             <SectionLabel>AI Matching Sensitivity</SectionLabel>
             <p style={{ color: "var(--text-secondary)", margin: "0 0 16px" }}>
               Controls how closely an item name must match a template.
@@ -489,11 +484,11 @@ export default function Settings() {
                 );
               })}
             </div>
-          </Card>
+          </Card>}
         </div>
 
         {/* ── Automation ── */}
-        <Card>
+        {settingsLoading ? <SkeletonCard /> : <Card>
           <SectionLabel>Automation</SectionLabel>
           <div className="flex items-center justify-between gap-3">
             <div>
@@ -554,7 +549,7 @@ export default function Settings() {
               </motion.div>
             )}
           </AnimatePresence>
-        </Card>
+        </Card>}
       </div>
 
       {/* ── Save Bar ── */}

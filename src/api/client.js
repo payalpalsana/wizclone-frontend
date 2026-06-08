@@ -8,12 +8,12 @@ const client = axios.create({
 
 client.interceptors.request.use(async (config) => {
   try {
-    const tokenRes = await getSessionToken();
-    if (tokenRes?.data) {
-      config.headers["Authorization"] = `Bearer ${tokenRes.data}`;
+    const token = await getSessionToken();
+    if (token) {
+      config.headers["Authorization"] = `Bearer ${token}`;
     }
-  } catch (_) {
-    // proceed without token in dev
+  } catch (err) {
+    console.warn("[API Client] Could not get session token:", err);
   }
   return config;
 });
@@ -27,26 +27,24 @@ client.interceptors.response.use(
   },
 );
 
-export const verifyApi = {
-  init: (payload) => client.post("/auth/verify", payload),
-};
-
 export const authApi = {
-  connect: (payload) => client.get("/auth/authorization", payload),
+  verify: (payload) => client.post("/auth/verify", payload),
 };
 
 export const settingsApi = {
-  get: (workspaceId) => client.get(`/settings/${workspaceId}`),
-  save: (workspaceId, data) => client.post(`/settings/${workspaceId}`, data),
+  get: (workspaceId) => client.post(`/settings/load`, { workspaceId }),
+  save: (workspaceId, data) => client.post(`/settings/save`, { workspaceId, ...data }),
 };
 
 export const activityApi = {
-  list: (params) => client.get("/activity", { params }),
+  list: (workspaceId, params) => client.get(`/activity-log/${workspaceId}`, { params }),
 };
 
 export const templateApi = {
-  generate: (prompt) => client.post("/templates/generate", { prompt }),
-  create: (data) => client.post("/templates", data),
+  list:   (workspaceId)                    => client.get(`/templates/${workspaceId}`),
+  create: (workspaceId, data)              => client.post(`/templates/${workspaceId}`, data),
+  update: (workspaceId, templateId, data)  => client.put(`/templates/${workspaceId}/${templateId}`, data),
+  remove: (workspaceId, templateId)        => client.delete(`/templates/${workspaceId}/${templateId}`),
 };
 
 export const plansApi = {

@@ -9,40 +9,37 @@ import {
   IconX,
 } from "@tabler/icons-react";
 import { useState } from "react";
-import { useToast } from "../context/ToastContext";
 import Badge from "./Badge";
 import { motion } from "framer-motion";
 
 function relDate(date) {
-  const diff = Date.now() - date.getTime();
+  const diff = Date.now() - new Date(date).getTime();
   const days = Math.floor(diff / 86400000);
   if (days === 0) return "Today";
   if (days === 1) return "Yesterday";
   return `${days} days ago`;
 }
 
-const TemplateCard = ({ template, onUpdate, onDelete, itemId }) => {
-  const [expanded, setExpanded] = useState(false);
-  const [editing, setEditing] = useState(false);
+const TemplateCard = ({ template, onUpdate, onDelete, isDeleting }) => {
+  const [expanded,      setExpanded]      = useState(false);
+  const [editing,       setEditing]       = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const toast = useToast();
 
-  const handleSave = (updated) => {
-    onUpdate(updated);
+  const handleSave = async (name, subitems) => {
+    await onUpdate(template.id, { name, subitems });
     setEditing(false);
     setExpanded(false);
-    toast.success("Template updated successfully");
   };
 
   const handleDelete = () => {
     onDelete(template.id);
-    toast.success("Template deleted");
+    setConfirmDelete(false);
   };
 
   const expandToggle = (e) => {
     e.stopPropagation();
+    if (editing) return;
     setExpanded((v) => !v);
-    setEditing(false);
   };
 
   return (
@@ -51,12 +48,14 @@ const TemplateCard = ({ template, onUpdate, onDelete, itemId }) => {
       style={{
         border: "1px solid var(--border)",
         backgroundColor: "var(--bg-primary)",
+        opacity: isDeleting ? 0.5 : 1,
+        transition: "opacity 0.2s",
       }}
     >
       {/* Header row */}
       <div
         className="flex items-center gap-3 px-4 py-3 cursor-pointer"
-        onClick={(e) => expandToggle(e)}
+        onClick={expandToggle}
       >
         {/* Expand toggle */}
         <button
@@ -107,51 +106,45 @@ const TemplateCard = ({ template, onUpdate, onDelete, itemId }) => {
               setExpanded(true);
             }}
             style={{
-              width: 30,
-              height: 30,
+              width: 30, height: 30,
               borderRadius: 6,
               border: "1px solid var(--border)",
               backgroundColor: "transparent",
               color: "var(--text-secondary)",
               cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
+              display: "flex", alignItems: "center", justifyContent: "center",
               transition: "background-color 120ms",
             }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = "var(--bg-secondary)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = "transparent";
-            }}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "var(--bg-secondary)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
           >
             <IconEdit size={13} />
           </button>
+
           {!confirmDelete ? (
             <button
               type="button"
               title="Delete template"
+              disabled={isDeleting}
               onClick={(e) => {
                 e.stopPropagation();
                 setConfirmDelete(true);
               }}
               style={{
-                width: 30,
-                height: 30,
+                width: 30, height: 30,
                 borderRadius: 6,
                 border: "1px solid var(--border)",
                 backgroundColor: "transparent",
                 color: "var(--text-secondary)",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
+                cursor: isDeleting ? "not-allowed" : "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center",
                 transition: "background-color 120ms, color 120ms",
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = "var(--danger-light)";
-                e.currentTarget.style.color = "var(--danger)";
+                if (!isDeleting) {
+                  e.currentTarget.style.backgroundColor = "var(--danger-light)";
+                  e.currentTarget.style.color = "var(--danger)";
+                }
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.backgroundColor = "transparent";
@@ -162,50 +155,28 @@ const TemplateCard = ({ template, onUpdate, onDelete, itemId }) => {
             </button>
           ) : (
             <div className="flex items-center gap-1">
-              <span
-                className="text-xs"
-                style={{ color: "var(--danger)", whiteSpace: "nowrap" }}
-              >
+              <span className="text-xs" style={{ color: "var(--danger)", whiteSpace: "nowrap" }}>
                 Delete?
               </span>
               <button
                 type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleDelete();
-                }}
+                onClick={(e) => { e.stopPropagation(); handleDelete(); }}
                 style={{
-                  width: 26,
-                  height: 26,
-                  borderRadius: 5,
-                  border: "none",
-                  backgroundColor: "var(--danger)",
-                  color: "#fff",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
+                  width: 26, height: 26, borderRadius: 5, border: "none",
+                  backgroundColor: "var(--danger)", color: "#fff",
+                  cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
                 }}
               >
                 <IconCheck size={12} />
               </button>
               <button
                 type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setConfirmDelete(false);
-                }}
+                onClick={(e) => { e.stopPropagation(); setConfirmDelete(false); }}
                 style={{
-                  width: 26,
-                  height: 26,
-                  borderRadius: 5,
-                  border: "1px solid var(--border)",
-                  backgroundColor: "transparent",
-                  color: "var(--text-muted)",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
+                  width: 26, height: 26, borderRadius: 5,
+                  border: "1px solid var(--border)", backgroundColor: "transparent",
+                  color: "var(--text-muted)", cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center",
                 }}
               >
                 <IconX size={12} />
@@ -216,6 +187,7 @@ const TemplateCard = ({ template, onUpdate, onDelete, itemId }) => {
       </div>
 
       <AnimatePresence>
+        {/* Subitem list (read-only expand) */}
         {expanded && !editing && (
           <motion.div
             key="list"
@@ -238,19 +210,12 @@ const TemplateCard = ({ template, onUpdate, onDelete, itemId }) => {
                 <li
                   key={s.id}
                   className="flex items-center gap-2 text-sm"
-                  style={{
-                    color: "var(--text-secondary)",
-                    padding: "3px 0",
-                    lineHeight: 1.5,
-                  }}
+                  style={{ color: "var(--text-secondary)", padding: "3px 0", lineHeight: 1.5 }}
                 >
                   <span
                     style={{
-                      color: "var(--text-muted)",
-                      fontSize: 12,
-                      width: 18,
-                      textAlign: "right",
-                      flexShrink: 0,
+                      color: "var(--text-muted)", fontSize: 12,
+                      width: 18, textAlign: "right", flexShrink: 0,
                     }}
                   >
                     {i + 1}.
@@ -266,13 +231,9 @@ const TemplateCard = ({ template, onUpdate, onDelete, itemId }) => {
         {editing && (
           <TemplateEditor
             key="editor"
-            // itemId={itemId}
             template={template}
             onSave={handleSave}
-            onCancel={() => {
-              setEditing(false);
-              setExpanded(false);
-            }}
+            onCancel={() => { setEditing(false); setExpanded(false); }}
           />
         )}
       </AnimatePresence>

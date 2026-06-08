@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   DndContext,
@@ -16,7 +16,7 @@ import {
   arrayMove,
 } from "@dnd-kit/sortable";
 
-import { IconPlus, IconX } from "@tabler/icons-react";
+import { IconLoader2, IconPlus, IconX } from "@tabler/icons-react";
 
 import Button from "./Button";
 import SortableSubitemRow from "./SortableSubitemRow";
@@ -24,9 +24,17 @@ import Input from "./Input";
 
 let _id = 0;
 
-export default function CreateTemplateModal({ open, onClose, onSubmit }) {
+export default function CreateTemplateModal({ open, onClose, onSubmit, isSubmitting }) {
   const [templateName, setTemplateName] = useState("");
   const [subitems, setSubitems] = useState([{ id: ++_id, name: "" }]);
+
+  // Reset form when modal closes
+  useEffect(() => {
+    if (!open) {
+      setTemplateName("");
+      setSubitems([{ id: ++_id, name: "" }]);
+    }
+  }, [open]);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -73,7 +81,7 @@ export default function CreateTemplateModal({ open, onClose, onSubmit }) {
       subitems: subitems.filter((s) => s.name.trim()),
     };
     onSubmit?.(payload);
-    onClose?.();
+    // Modal stays open until mutation succeeds (parent closes it via onClose)
   };
 
   return (
@@ -167,16 +175,17 @@ export default function CreateTemplateModal({ open, onClose, onSubmit }) {
 
             {/* Footer */}
             <div className="flex items-center justify-end gap-2 border-t border-[var(--border)] px-5 py-4">
-              <Button variant="secondary" onClick={onClose}>
+              <Button variant="secondary" onClick={onClose} disabled={isSubmitting}>
                 Cancel
               </Button>
 
               <Button
                 variant="primary"
                 onClick={handleCreate}
-                disabled={!templateName.trim()}
+                disabled={!templateName.trim() || isSubmitting}
               >
-                Create Template
+                {isSubmitting && <IconLoader2 size={13} className="animate-spin" />}
+                {isSubmitting ? "Creating..." : "Create Template"}
               </Button>
             </div>
           </motion.div>

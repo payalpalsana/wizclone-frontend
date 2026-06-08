@@ -1,30 +1,76 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { IconLock, IconLoader2 } from "@tabler/icons-react";
 import { useWindowWidth } from "../hooks/useWindowWidth";
 import { WizLogo } from "../utils/icon";
-import { authApi } from "../api/client";
+import { useWorkspace } from "../context/WorkspaceContext";
+import monday from "../lib/monday";
+
+function buildOAuthUrl() {
+  // VITE_API_BASE_URL may or may not end in /api — use VITE_BACKEND_URL for the
+  // raw origin so the callback path is always exactly /api/auth/callback.
+  const backendOrigin =
+    import.meta.env.VITE_BACKEND_URL ||
+    import.meta.env.VITE_API_BASE_URL?.replace(/\/api\/?$/, "");
+  const redirectUri = `${backendOrigin}/api/auth/callback`;
+
+  const params = new URLSearchParams({
+    client_id: import.meta.env.VITE_CLIENT_ID,
+    redirect_uri: redirectUri,
+    scope:
+      "me:read boards:read boards:write workspaces:read users:read account:read webhooks:write webhooks:read",
+  });
+
+  return `https://auth.monday.com/oauth2/authorize?${params.toString()}`;
+}
 
 export default function Onboard() {
-  const [status, setStatus] = useState("idle"); // idle | loading | error
+  const [status, setStatus] = useState("idle"); // idle | loading | success | error
+  const { refreshAuth } = useWorkspace();
+  const navigate = useNavigate();
   const width = useWindowWidth();
   const isMobile = width > 0 && width < 480;
 
-  const handleConnect = () => {
-    authApi
-      .connect()
-      .then((res) => {
-        console.log("res: ", res);
-        if (res?.authorization_url) {
-          window.location.href = res.authorization_url;
-        } else {
-          throw new Error("Invalid response from server");
+  useEffect(() => {
+    if (status !== "loading") return;
+
+    let attempts = 0;
+    const MAX = 24;
+    const DELAY = 2500;
+
+    const timer = setInterval(async () => {
+      attempts++;
+      try {
+        const connected = await refreshAuth();
+        if (connected) {
+          setStatus("success");
+          clearInterval(timer);
+          navigate("/settings", { replace: true });
         }
-      })
-      .catch((err) => {
-        console.error("Connection error:", err);
+      } catch {
+        // keep polling
+      }
+      if (attempts >= MAX) {
+        clearInterval(timer);
         setStatus("error");
-      });
+      }
+    }, DELAY);
+
+    return () => clearInterval(timer);
+  }, [status, refreshAuth, navigate]);
+
+  const handleConnect = async () => {
+    setStatus("loading");
+
+    const oauthUrl = buildOAuthUrl();
+    console.log("[Onboard] AUTH URL:", oauthUrl);
+
+    try {
+      await monday.execute("openLinkInTab", { url: oauthUrl });
+    } catch {
+      window.location.href = oauthUrl;
+    }
   };
 
   return (
@@ -71,17 +117,23 @@ export default function Onboard() {
 
           <button
             onClick={handleConnect}
-            disabled={status === "loading"}
+            disabled={status === "loading" || status === "success"}
             style={{
               width: "100%",
               height: 40,
               borderRadius: 8,
-              backgroundColor: "var(--accent)",
+              backgroundColor:
+                status === "success"
+                  ? "var(--success, #22c55e)"
+                  : "var(--accent)",
               color: "#fff",
               fontSize: 14,
               fontWeight: 500,
               border: "none",
-              cursor: status === "loading" ? "not-allowed" : "pointer",
+              cursor:
+                status === "loading" || status === "success"
+                  ? "not-allowed"
+                  : "pointer",
               opacity: status === "loading" ? 0.8 : 1,
               display: "flex",
               alignItems: "center",
@@ -92,11 +144,12 @@ export default function Onboard() {
               transition: "background-color 120ms, opacity 120ms",
             }}
             onMouseEnter={(e) => {
-              if (status !== "loading")
+              if (status === "idle")
                 e.currentTarget.style.backgroundColor = "var(--accent-hover)";
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = "var(--accent)";
+              if (status === "idle")
+                e.currentTarget.style.backgroundColor = "var(--accent)";
             }}
           >
             {status === "loading" && (
@@ -107,9 +160,44 @@ export default function Onboard() {
               : "Connect with monday.com"}
           </button>
 
+          {/* Loading hint */}
+          {status === "loading" && (
+            <p
+              style={{
+                fontSize: 12,
+                color: "var(--text-muted)",
+                marginBottom: 12,
+              }}
+            >
+              A monday.com authorization window has opened. Approve it to
+              continue.
+            </p>
+          )}
+
+          {/* Error */}
           {status === "error" && (
-            <p className="text-sm mb-3" style={{ color: "var(--danger)" }}>
-              Connection failed. Please try again.
+            <p
+              style={{
+                fontSize: 13,
+                color: "var(--danger)",
+                marginBottom: 12,
+              }}
+            >
+              Authorization timed out or failed.{" "}
+              <button
+                onClick={() => setStatus("idle")}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "var(--accent)",
+                  cursor: "pointer",
+                  fontSize: 13,
+                  padding: 0,
+                  fontFamily: "inherit",
+                }}
+              >
+                Try again
+              </button>
             </p>
           )}
 

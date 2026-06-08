@@ -138,48 +138,39 @@ export const fetchBoards = async () => {
 // };
 
 export const fetchAutomationBoards = async (workspaceId) => {
-  const res = await settingsApi.get(workspaceId);
-  return res.boards ?? [];
+  return settingsApi.get(workspaceId);
 };
 
-export const addAutomationBoard = async (
-  workspaceId,
-  board,
-  currentSettings,
-) => {
+export const addAutomationBoard = async (workspaceId, board, currentSettings) => {
   const updatedBoards = [
-    ...currentSettings.boards,
-    { id: board.id, name: board.name, user_enabled: false },
+    ...(currentSettings?.boards ?? []),
+    { board_id: parseInt(board.id), board_name: board.name, board_enabled: false },
   ];
   return settingsApi.save(workspaceId, {
-    ...currentSettings,
+    sensitivity: currentSettings?.sensitivity,
+    automation_enabled: currentSettings?.automation_enabled,
     boards: updatedBoards,
   });
 };
 
-export const updateAutomationBoard = async (
-  workspaceId,
-  boardId,
-  enabled,
-  currentSettings,
-) => {
-  const updatedBoards = currentSettings.boards.map((b) =>
-    b.id === boardId ? { ...b, user_enabled: enabled } : b,
+export const updateAutomationBoard = async (workspaceId, boardId, enabled, currentSettings) => {
+  const updatedBoards = (currentSettings?.boards ?? []).map((b) =>
+    b.board_id === boardId ? { ...b, board_enabled: enabled } : b,
   );
   return settingsApi.save(workspaceId, {
-    ...currentSettings,
+    sensitivity: currentSettings?.sensitivity,
+    automation_enabled: currentSettings?.automation_enabled,
     boards: updatedBoards,
   });
 };
 
-export const removeAutomationBoard = async (
-  workspaceId,
-  boardId,
-  currentSettings,
-) => {
-  const updatedBoards = currentSettings.boards.filter((b) => b.id !== boardId);
+export const removeAutomationBoard = async (workspaceId, boardId, currentSettings) => {
+  const updatedBoards = (currentSettings?.boards ?? []).filter(
+    (b) => b.board_id !== boardId,
+  );
   return settingsApi.save(workspaceId, {
-    ...currentSettings,
+    sensitivity: currentSettings?.sensitivity,
+    automation_enabled: currentSettings?.automation_enabled,
     boards: updatedBoards,
   });
 };
