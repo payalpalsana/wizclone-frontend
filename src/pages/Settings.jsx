@@ -1,11 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   IconCheck,
   IconLoader2,
   IconAlertTriangle,
-  IconX,
+  IconTrash,
 } from "@tabler/icons-react";
 import Card, { SectionLabel } from "../components/Card";
 import Select from "../components/Select";
@@ -29,16 +29,20 @@ export default function Settings() {
 
   const [saveState, setSaveState] = useState("idle");
 
-  const {
-    data: workspaceBoards = [],
-    isLoading: workspaceBoardsLoading,
-    refetch: refetchWorkspaceBoards,
-  } = useQuery({
-    queryKey: ["workspaceBoards", workspaceId],
-    queryFn: fetchBoards,
-    enabled: false,
-    retry: false,
-  });
+  const [workspaceBoards, setWorkspaceBoards] = useState([]);
+  const [workspaceBoardsLoading, setWorkspaceBoardsLoading] = useState(false);
+
+  const loadBoards = async () => {
+    setWorkspaceBoardsLoading(true);
+    try {
+      const boards = await fetchBoards();
+      setWorkspaceBoards(boards);
+    } catch {
+      setWorkspaceBoards([]);
+    } finally {
+      setWorkspaceBoardsLoading(false);
+    }
+  };
 
   const { data: settings, isLoading: settingsLoading, isError: settingsError } = useQuery({
     queryKey: ["settings", workspaceId],
@@ -48,26 +52,20 @@ export default function Settings() {
     staleTime: 0,
   });
 
-  // Local state — all edits live here; only flushed to API on Save
   const [automationBoards, setAutomationBoards] = useState([]);
   const [sensitivity, setSensitivity]           = useState("balanced");
   const [automationEnabled, setAutomationEnabled] = useState(true);
-  const [settingsSynced, setSettingsSynced]       = useState(false);
+  const syncedWorkspaceRef = useRef(null);
 
-  // Reset sync flag whenever workspace changes
-  useEffect(() => { setSettingsSynced(false); }, [workspaceId]);
-
-  // Sync from server once per load (doesn't overwrite local edits on re-render)
   useEffect(() => {
-    if (settings && !settingsSynced) {
+    if (settings && syncedWorkspaceRef.current !== workspaceId) {
       setAutomationBoards(settings.boards ?? []);
       setSensitivity(settings.sensitivity?.toLowerCase() ?? "balanced");
       setAutomationEnabled(settings.automation_enabled ?? true);
-      setSettingsSynced(true);
+      syncedWorkspaceRef.current = workspaceId;
     }
-  }, [settings, settingsSynced]);
+  }, [settings, workspaceId]);
 
-  // ── Board operations (local state only — no API call) ──
   const handleBoardSelect = (boardId) => {
     if (automationBoards.some((b) => String(b.board_id) === String(boardId))) {
       toast.error("Board already added");
@@ -100,7 +98,7 @@ export default function Settings() {
         boards: automationBoards,
       });
       // Re-sync from server after save so DB state is reflected
-      setSettingsSynced(false);
+      syncedWorkspaceRef.current = null;
       queryClient.invalidateQueries({ queryKey: ["settings", workspaceId] });
       setSaveState("saved");
       toast.success("Settings saved successfully");
@@ -112,9 +110,11 @@ export default function Settings() {
   };
 
   const addedBoardIds = new Set(automationBoards.map((b) => String(b.board_id)));
-  const boardOptions = workspaceBoards
-    .filter((b) => !addedBoardIds.has(String(b.id)))
-    .map((b) => ({ value: b.id, label: b.name }));
+  const boardOptions = workspaceBoards.map((b) => ({
+    value: b.id,
+    label: b.name,
+    disabled: addedBoardIds.has(String(b.id)),
+  }));
 
   const sidebarW = isNarrow ? 0 : isMobile ? 52 : 200;
   const contentDisabled = !automationEnabled;
@@ -180,10 +180,7 @@ export default function Settings() {
               <Select
                 value=""
                 onChange={handleBoardSelect}
-                onOpen={() => {
-                  console.log("Select opened");
-                  refetchWorkspaceBoards();
-                }}
+                onOpen={loadBoards}
                 options={workspaceBoardsLoading ? [] : boardOptions}
                 placeholder={
                   workspaceBoardsLoading
@@ -316,44 +313,10 @@ export default function Settings() {
                                     "var(--text-muted)")
                                 }
                               >
-                                <IconX size={14} />
+                                <IconTrash size={14} />
                               </button>
                             </div>
                           </div>
-
-                          <AnimatePresence>
-                            {!board.board_enabled && (
-                              <motion.div
-                                key={`warn-${board.board_id}`}
-                                initial={{ opacity: 0, height: 0 }}
-                                animate={{ opacity: 1, height: "auto" }}
-                                exit={{ opacity: 0, height: 0 }}
-                                transition={{ duration: 0.18 }}
-                                style={{ overflow: "hidden" }}
-                              >
-                                <div
-                                  className="rounded-lg px-3 py-2 text-sm"
-                                  style={{
-                                    backgroundColor: "var(--warning-light)",
-                                    color: "var(--warning)",
-                                    display: "flex",
-                                    alignItems: "flex-start",
-                                    gap: 8,
-                                    marginTop: 10,
-                                  }}
-                                >
-                                  <IconAlertTriangle
-                                    size={14}
-                                    style={{ flexShrink: 0, marginTop: 1 }}
-                                  />
-                                  <span>
-                                    This board is paused. New items will not
-                                    receive subitems until you re-enable it.
-                                  </span>
-                                </div>
-                              </motion.div>
-                            )}
-                          </AnimatePresence>
                         </div>
                       </motion.div>
                     ))

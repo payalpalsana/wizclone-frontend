@@ -6,12 +6,42 @@ const client = axios.create({
   timeout: 15000,
 });
 
+// monday.com session tokens are JWTs valid for 24 hours and are re-generated
+// only on a full app reload (hard refresh clears JS module state anyway).
+// We cache for the tab lifetime — no TTL needed. This prevents stalling every
+// API call on the SDK iframe handshake, which on hard refresh can take 2-5s.
+let _cachedToken = null;
+let _tokenPromise = null;
+
+function getTokenWithTimeout(ms = 5000) {
+  return Promise.race([
+    getSessionToken(),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("sessionToken timeout")), ms)
+    ),
+  ]);
+}
+
+async function getCachedToken() {
+  if (_cachedToken) return _cachedToken;
+  // Deduplicate concurrent requests (multiple API calls fired on mount)
+  if (!_tokenPromise) {
+    _tokenPromise = getTokenWithTimeout()
+      .then((t) => { _cachedToken = t; return t; })
+      .catch(() => null)
+      .finally(() => { _tokenPromise = null; });
+  }
+  return _tokenPromise;
+}
+
+export function clearTokenCache() {
+  _cachedToken = null;
+}
+
 client.interceptors.request.use(async (config) => {
   try {
-    const token = await getSessionToken();
-    if (token) {
-      config.headers["Authorization"] = `Bearer ${token}`;
-    }
+    const token = await getCachedToken();
+    if (token) config.headers["Authorization"] = `Bearer ${token}`;
   } catch (err) {
     console.warn("[API Client] Could not get session token:", err);
   }

@@ -149,13 +149,15 @@ export default function Select({
             </div>
           ) : (
             options.map((option) => {
-              const isSelected = option.value === value;
+              const isAdded = option.disabled;
 
               return (
                 <button
                   key={option.value}
                   type="button"
+                  disabled={isAdded}
                   onClick={() => {
+                    if (isAdded) return;
                     onChange(option.value);
                     setOpen(false);
                   }}
@@ -168,22 +170,21 @@ export default function Select({
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "space-between",
-                    background: isSelected
-                      ? "var(--accent-light)"
-                      : "transparent",
-                    color: "var(--text-primary)",
-                    cursor: "pointer",
+                    background: isAdded ? "var(--bg-secondary)" : "transparent",
+                    color: isAdded ? "var(--text-muted)" : "var(--text-primary)",
+                    cursor: isAdded ? "default" : "pointer",
                     fontSize: 14,
-                    fontWeight: isSelected ? 500 : 400,
+                    fontWeight: 400,
                     transition: "background-color 120ms ease",
+                    opacity: isAdded ? 0.7 : 1,
                   }}
                   onMouseEnter={(e) => {
-                    if (!isSelected) {
+                    if (!isAdded) {
                       e.currentTarget.style.background = "var(--bg-secondary)";
                     }
                   }}
                   onMouseLeave={(e) => {
-                    if (!isSelected) {
+                    if (!isAdded) {
                       e.currentTarget.style.background = "transparent";
                     }
                   }}
@@ -198,7 +199,12 @@ export default function Select({
                     {option.label}
                   </span>
 
-                  {isSelected && <IconCheck size={15} color="var(--accent)" />}
+                  {isAdded && (
+                    <span style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+                      <IconCheck size={13} color="var(--accent)" />
+                      <span style={{ fontSize: 11, color: "var(--accent)" }}>Added</span>
+                    </span>
+                  )}
                 </button>
               );
             })

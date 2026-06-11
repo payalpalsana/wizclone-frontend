@@ -9,24 +9,33 @@ import { getContext, getSessionToken } from "../lib/monday";
 import { authApi } from "../api/client";
 
 // ─────────────────────────────────────────────────────────────
-// Session cache keys
+// Auth cache — localStorage so it persists across tabs and
+// browser restarts. Cache is only trusted for 30 minutes to
+// avoid serving stale state after a revoke/uninstall.
 // ─────────────────────────────────────────────────────────────
-const CACHE_DONE_KEY = "wc_auth_init_done";
-const CACHE_RESULT_KEY = "wc_auth_init_result";
+const CACHE_KEY   = "wc_auth_v2";
+const CACHE_TTL   = 30 * 60 * 1000; // 30 minutes
 
 export function clearAuthCache() {
-  sessionStorage.removeItem(CACHE_DONE_KEY);
-  sessionStorage.removeItem(CACHE_RESULT_KEY);
+  localStorage.removeItem(CACHE_KEY);
 }
 
 function getCachedAuth() {
-  if (sessionStorage.getItem(CACHE_DONE_KEY) !== "1") return null;
-  return sessionStorage.getItem(CACHE_RESULT_KEY) === "true";
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const { value, ts } = JSON.parse(raw);
+    if (Date.now() - ts > CACHE_TTL) { localStorage.removeItem(CACHE_KEY); return null; }
+    return value; // boolean
+  } catch {
+    return null;
+  }
 }
 
 function setCachedAuth(value) {
-  sessionStorage.setItem(CACHE_DONE_KEY, "1");
-  sessionStorage.setItem(CACHE_RESULT_KEY, String(value));
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ value, ts: Date.now() }));
+  } catch { /* storage quota — ignore */ }
 }
 
 const WorkspaceContext = createContext(null);
@@ -60,32 +69,30 @@ export function WorkspaceProvider({ children }) {
 
       const result = await authApi.verify({
         sessionToken,
-        accountId: data.account?.id,
-        userId: data.user?.id,
+        accountId:   data.account?.id,
+        userId:      data.user?.id,
         workspaceId: data.workspaceId,
       });
 
-      const oauthConnected = result?.has_oauth ?? result?.hasOAuth ?? false;
+      const oauthConnected = result?.has_oauth ?? false;
       setCachedAuth(oauthConnected);
       setHasOAuth(oauthConnected);
       return oauthConnected;
     } catch (err) {
       console.error("[WorkspaceProvider] refreshAuth error:", err);
       setError(err.message ?? "Auth refresh failed");
-      setHasOAuth(false);
+      // Don't flip hasOAuth on transient errors — caller decides what to do
       return false;
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // Bootstrap on mount
   useEffect(() => {
     let cancelled = false;
 
     async function bootstrap() {
       try {
-        // 1. Get monday context
         const ctx = await getContext();
         if (cancelled) return;
 
@@ -94,14 +101,12 @@ export function WorkspaceProvider({ children }) {
         setAccountId(data.account?.id ?? null);
         setUserId(data.user?.id ?? null);
 
-        // 2. Use session cache if available
         const cached = getCachedAuth();
         if (cached !== null) {
           setHasOAuth(cached);
           return;
         }
 
-        // 3. Get session token (non-fatal if missing)
         let sessionToken = "";
         try {
           sessionToken = (await getSessionToken()) ?? "";
@@ -112,17 +117,16 @@ export function WorkspaceProvider({ children }) {
 
         if (cancelled) return;
 
-        // 4. Verify with backend
         const result = await authApi.verify({
           sessionToken,
-          accountId: data.account?.id,
-          userId: data.user?.id,
+          accountId:   data.account?.id,
+          userId:      data.user?.id,
           workspaceId: data.workspaceId,
         });
 
         if (cancelled) return;
 
-        const oauthConnected = result?.has_oauth ?? result?.hasOAuth ?? false;
+        const oauthConnected = result?.has_oauth ?? false;
         setCachedAuth(oauthConnected);
         setHasOAuth(oauthConnected);
 
@@ -130,8 +134,23 @@ export function WorkspaceProvider({ children }) {
       } catch (err) {
         if (!cancelled) {
           console.error("[WorkspaceProvider] bootstrap error:", err);
-          setError(err.message ?? "Bootstrap failed");
-          setHasOAuth(false);
+          const isAuthError = err?.message?.includes("401") || err?.message?.includes("Cannot identify");
+          if (isAuthError) {
+            clearAuthCache();
+            setHasOAuth(false);
+          } else {
+            const isTimeout = err?.message?.toLowerCase().includes("timeout");
+            const isNetworkDown = err?.message?.includes("Network Error") || err?.message?.includes("ERR_NAME_NOT_RESOLVED");
+            let friendlyMessage;
+            if (isTimeout) {
+              friendlyMessage = "The server is not responding (timeout). Please check if the backend server is running and try again.";
+            } else if (isNetworkDown) {
+              friendlyMessage = "Cannot reach the server. The backend may be offline or the tunnel URL may have changed.";
+            } else {
+              friendlyMessage = `Server error: ${err.message ?? "Unknown error"}. Please refresh or contact support.`;
+            }
+            setError(friendlyMessage);
+          }
         }
       } finally {
         if (!cancelled) setLoading(false);
