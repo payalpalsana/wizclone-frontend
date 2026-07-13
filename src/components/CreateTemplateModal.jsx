@@ -21,6 +21,8 @@ import { IconLoader2, IconPlus, IconX } from "@tabler/icons-react";
 import Button from "./Button";
 import SortableSubitemRow from "./SortableSubitemRow";
 import Input from "./Input";
+import { sanitizeInput } from "../lib/sanitize";
+import { trackValueCreated } from "../lib/monday";
 
 let _id = 0;
 
@@ -77,11 +79,13 @@ export default function CreateTemplateModal({ open, onClose, onSubmit, isSubmitt
 
   const handleCreate = () => {
     const payload = {
-      name: templateName,
-      subitems: subitems.filter((s) => s.name.trim()),
+      name: sanitizeInput(templateName),
+      subitems: subitems
+        .map((s) => ({ ...s, name: sanitizeInput(s.name) }))
+        .filter((s) => s.name.trim()),
     };
+    trackValueCreated(); // Fire monday value-created event
     onSubmit?.(payload);
-    // Modal stays open until mutation succeeds (parent closes it via onClose)
   };
 
   return (

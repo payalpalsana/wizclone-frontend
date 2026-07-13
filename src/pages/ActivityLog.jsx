@@ -1,15 +1,15 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { IconChevronDown, IconChevronUp, IconCheck } from "@tabler/icons-react";
 import Badge from "../components/Badge";
-import EmptyState from "../components/EmptyState";
+import EmptyState, { NoActivityIllustration, NoSearchResultsIllustration } from "../components/EmptyState";
 import { useWindowWidth } from "../hooks/useWindowWidth";
 import Search from "../components/Search";
-import { EmptyStateIcon } from "../utils/icon";
 import { SkeletonCard } from "../components/Skeleton";
 import { useWorkspace } from "../context/WorkspaceContext";
 import { activityApi } from "../api/client";
+import { useDebounce } from "../hooks/useDebounce";
 
 // Map backend status → frontend variant + label
 const STATUS_MAP = {
@@ -210,17 +210,24 @@ export default function ActivityLog() {
   const [search, setSearch] = useState("");
   const [page,   setPage]   = useState(1);
 
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ["activity-log", queryId, filter, search, page],
+  const debouncedSearch = useDebounce(search, 400);
+
+  // Reset to page 1 whenever the debounced search term actually changes
+  useEffect(() => { setPage(1); }, [debouncedSearch]);
+
+  const { data, isLoading, isFetching, isError } = useQuery({
+    queryKey: ["activity-log", queryId, filter, debouncedSearch, page],
     queryFn:  () => activityApi.list(queryId, {
       status: filter === "all" ? undefined : filter,
-      search: search || undefined,
+      search: debouncedSearch || undefined,
       page,
       limit: 20,
     }),
-    enabled:   !!queryId,
-    staleTime: 0,
-    retry:     false,
+    enabled:              !!queryId,
+    staleTime:            0,
+    retry:                false,
+    placeholderData:      keepPreviousData,
+    refetchOnWindowFocus: false,
   });
 
   const items      = data?.items      ?? [];
@@ -235,7 +242,7 @@ export default function ActivityLog() {
 
   const handleSearchChange = (val) => {
     setSearch(val);
-    setPage(1);
+    // page reset is handled by the useEffect on debouncedSearch
   };
 
   return (
@@ -295,24 +302,36 @@ export default function ActivityLog() {
         <Search search={search} setSearch={handleSearchChange} isMobile={isMobile} placeholder="Search automations..." />
       </div>
 
-      <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-        {isLoading && (
-          <div className="flex flex-col gap-3">
-            <SkeletonCard /><SkeletonCard /><SkeletonCard />
-          </div>
-        )}
+      {/* Skeleton — clipped, never scrolls */}
+      {isLoading && (
+        <div style={{ flex: 1, minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column", gap: 12, paddingBottom: 16 }}>
+          <SkeletonCard /><SkeletonCard /><SkeletonCard />
+        </div>
+      )}
 
-        {isError && !isLoading && (
-          <EmptyState illustration={<EmptyStateIcon />} heading="Failed to load activity" subtext="Could not reach the server. Please refresh the page." />
-        )}
+      {/* Error — centered, never scrolls */}
+      {isError && !isLoading && (
+        <div style={{ flex: 1, minHeight: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <EmptyState illustration={<NoActivityIllustration />} heading="Failed to load activity" subtext="Could not reach the server. Please refresh the page." />
+        </div>
+      )}
 
-        {!isLoading && !isError && items.length === 0 && (
-          <EmptyState illustration={<EmptyStateIcon />} heading="No automations have run yet" subtext="Create a new item on your board to trigger WizClone for the first time." />
-        )}
+      {/* Empty — centered, never scrolls */}
+      {!isLoading && !isError && items.length === 0 && (
+        <div style={{ flex: 1, minHeight: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <EmptyState
+            illustration={debouncedSearch ? <NoSearchResultsIllustration /> : <NoActivityIllustration />}
+            heading={debouncedSearch ? "No results found" : "No automations have run yet"}
+            subtext={debouncedSearch ? "Try a different search term." : "Create a new item on your board to trigger WizClone for the first time."}
+          />
+        </div>
+      )}
 
-        {!isLoading && !isError && items.length > 0 && (
-          isMobile ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      {/* Data — scrolls inside a flex column */}
+      {!isLoading && !isError && items.length > 0 && (
+        <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+          {isMobile ? (
+            <div style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
               {items.map((log) => <LogCard key={log.id} log={log} />)}
             </div>
           ) : (
@@ -334,26 +353,26 @@ export default function ActivityLog() {
                 </table>
               </div>
             </div>
-          )
-        )}
+          )}
 
-        {/* Pagination */}
-        {!isLoading && totalPages > 1 && (
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 16, flexWrap: "wrap", gap: 8 }}>
-            <span style={{ fontSize: 13, color: "var(--text-muted)" }}>
-              {(page - 1) * 20 + 1}–{Math.min(page * 20, total)} of {total} events
-            </span>
-            <div style={{ display: "flex", gap: 8 }}>
-              {[["Previous", page === 1, () => setPage((p) => p - 1)], ["Next", page >= totalPages, () => setPage((p) => p + 1)]].map(([label, disabled, action]) => (
-                <button key={label} type="button" disabled={disabled} onClick={action}
-                  style={{ height: 32, paddingInline: 12, borderRadius: 6, border: "1px solid var(--border)", backgroundColor: "var(--bg-primary)", color: disabled ? "var(--text-muted)" : "var(--text-primary)", fontSize: 13, cursor: disabled ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
-                  {label}
-                </button>
-              ))}
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 16, flexWrap: "wrap", gap: 8, flexShrink: 0 }}>
+              <span style={{ fontSize: 13, color: "var(--text-muted)" }}>
+                {(page - 1) * 20 + 1}–{Math.min(page * 20, total)} of {total} events
+              </span>
+              <div style={{ display: "flex", gap: 8 }}>
+                {[["Previous", page === 1, () => setPage((p) => p - 1)], ["Next", page >= totalPages, () => setPage((p) => p + 1)]].map(([label, disabled, action]) => (
+                  <button key={label} type="button" disabled={disabled} onClick={action}
+                    style={{ height: 32, paddingInline: 12, borderRadius: 6, border: "1px solid var(--border)", backgroundColor: "var(--bg-primary)", color: disabled ? "var(--text-muted)" : "var(--text-primary)", fontSize: 13, cursor: disabled ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
+                    {label}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
     </motion.div>
   );
 }

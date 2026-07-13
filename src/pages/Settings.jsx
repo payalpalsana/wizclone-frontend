@@ -18,6 +18,7 @@ import { SENSITIVITY_OPTIONS } from "../utils/constant";
 import Button from "../components/Button";
 import { useWorkspace } from "../context/WorkspaceContext";
 import { settingsApi } from "../api/client";
+import DeleteConfirmModal from "../components/DeleteConfirmModal";
 
 export default function Settings() {
   const toast = useToast();
@@ -49,7 +50,8 @@ export default function Settings() {
     queryFn: () => fetchAutomationBoards(workspaceId),
     enabled: !!workspaceId,
     retry: false,
-    staleTime: 0,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const [automationBoards, setAutomationBoards] = useState([]);
@@ -85,8 +87,23 @@ export default function Settings() {
     );
   };
 
-  const handleRemoveBoard = (boardId) => {
-    setAutomationBoards((prev) => prev.filter((b) => String(b.board_id) !== String(boardId)));
+  const [deletingBoard, setDeletingBoard] = useState(null);
+  const [isDeleting,    setIsDeleting]    = useState(false);
+
+  const handleDeleteBoardConfirm = async () => {
+    if (!deletingBoard) return;
+    setIsDeleting(true);
+    try {
+      await settingsApi.deleteBoard(workspaceId, deletingBoard.board_id);
+      toast.success("Board removed");
+      setDeletingBoard(null);
+      syncedWorkspaceRef.current = null;
+      queryClient.invalidateQueries({ queryKey: ["settings", workspaceId] });
+    } catch {
+      toast.error("Failed to remove board");
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const handleSave = async () => {
@@ -97,7 +114,6 @@ export default function Settings() {
         automation_enabled: automationEnabled,
         boards: automationBoards,
       });
-      // Re-sync from server after save so DB state is reflected
       syncedWorkspaceRef.current = null;
       queryClient.invalidateQueries({ queryKey: ["settings", workspaceId] });
       setSaveState("saved");
@@ -154,7 +170,6 @@ export default function Settings() {
       )}
 
       <div className="flex flex-col gap-4 flex-1">
-        {/* ── Template Board ── */}
         <div
           style={{
             opacity: contentDisabled ? 0.45 : 1,
@@ -190,7 +205,6 @@ export default function Settings() {
                 disabled={false}
                 loading={workspaceBoardsLoading}
               />
-
               <div
                 style={{
                   display: "flex",
@@ -291,8 +305,7 @@ export default function Settings() {
                               />
                               <button
                                 type="button"
-                                onClick={() => handleRemoveBoard(board.board_id)}
-                                disabled={false}
+                                onClick={() => setDeletingBoard(board)}
                                 style={{
                                   background: "none",
                                   border: "none",
@@ -304,14 +317,8 @@ export default function Settings() {
                                   alignItems: "center",
                                   transition: "color 0.15s",
                                 }}
-                                onMouseEnter={(e) =>
-                                  (e.currentTarget.style.color =
-                                    "var(--warning)")
-                                }
-                                onMouseLeave={(e) =>
-                                  (e.currentTarget.style.color =
-                                    "var(--text-muted)")
-                                }
+                                onMouseEnter={(e) => (e.currentTarget.style.color = "var(--danger)")}
+                                onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-muted)")}
                               >
                                 <IconTrash size={14} />
                               </button>
@@ -514,6 +521,14 @@ export default function Settings() {
           </AnimatePresence>
         </Card>}
       </div>
+
+      <DeleteConfirmModal
+        open={!!deletingBoard}
+        templateName={deletingBoard?.board_name ?? ""}
+        isDeleting={isDeleting}
+        onConfirm={handleDeleteBoardConfirm}
+        onClose={() => !isDeleting && setDeletingBoard(null)}
+      />
 
       {/* ── Save Bar ── */}
       <div

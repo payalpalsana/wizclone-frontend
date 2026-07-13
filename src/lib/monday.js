@@ -5,12 +5,10 @@ const monday = mondaySdk();
 
 export const initMonday = () => {
   monday.setApiVersion("2024-01");
-  console.log("Monday SDK initialized");
 };
 
 export const getContext = async () => {
   const context = await monday.get("context");
-  console.log("Context:", context);
   return context;
 };
 
@@ -19,7 +17,6 @@ export const getSessionToken = async () => {
     const res = await monday.get("sessionToken");
     return res.data;
   } catch (err) {
-    console.error("Failed to get session token", err);
     throw err;
   }
 };
@@ -42,6 +39,10 @@ export const openLinkInTab = (url) => {
 
 export const showConfirmation = (message) => {
   return monday.execute("confirm", { message });
+};
+
+export const trackValueCreated = () => {
+  return monday.execute("valueCreatedForUser");
 };
 
 export const queryMonday = async (query, variables = {}) => {

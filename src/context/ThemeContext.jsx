@@ -28,8 +28,8 @@ export function ThemeProvider({ children }) {
           res?.data?.theme === "dark" || res?.data?.theme === "black";
         setTheme(mondayDark ? "dark" : "light");
       });
-    } catch (e) {
-      console.error(e);
+    } catch {
+      // non-fatal
     }
   }, []);
 

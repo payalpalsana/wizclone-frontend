@@ -6,34 +6,44 @@ const PLANS = [
     key: 'free',
     name: 'Free',
     price: '$0',
-    automations: 50,
-    templates: 3,
-    ai: false,
+    copies: 50,
+    aiMatching: 'Limited trial',
+    builder: 'No',
+  },
+  {
+    key: 'starter',
+    name: 'Starter',
+    price: '$19',
+    period: '/mo',
+    copies: 500,
+    aiMatching: 'Yes',
+    builder: 'No',
   },
   {
     key: 'pro',
     name: 'Pro',
-    price: '$12',
+    price: '$49',
     period: '/mo',
-    automations: 500,
-    templates: 'Unlimited',
-    ai: true,
+    copies: 2500,
+    aiMatching: 'Yes',
+    builder: 'Yes',
     recommended: true,
   },
   {
     key: 'business',
     name: 'Business',
-    price: '$29',
+    price: '$99',
     period: '/mo',
-    automations: 'Unlimited',
-    templates: 'Unlimited',
-    ai: true,
+    copies: 10000,
+    aiMatching: 'Yes',
+    builder: 'Yes+',
   },
 ]
 
 export default function UpgradeModal({ isOpen, onClose, currentPlan = 'free', used = 47, limit = 50 }) {
   const pct = Math.min((used / limit) * 100, 100)
   const isNearLimit = pct >= 90
+  const isFreePlan = currentPlan === 'free'
 
   return (
     <AnimatePresence>
@@ -111,11 +121,15 @@ export default function UpgradeModal({ isOpen, onClose, currentPlan = 'free', us
                 You've reached your plan limit
               </h2>
 
+              <p className="text-sm" style={{ color: 'var(--text-secondary)', margin: '0 0 12px' }}>
+                New installs get a 14-day free Pro trial. After trial, pick a plan based on monthly copy volume.
+              </p>
+
               {/* Usage bar */}
               <div className="text-left">
                 <div className="flex justify-between mb-1.5">
                   <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                    {used} / {limit} automations used this month
+                    {used} / {limit} copies used this month
                   </span>
                   <span
                     className="text-sm font-medium"
@@ -146,7 +160,7 @@ export default function UpgradeModal({ isOpen, onClose, currentPlan = 'free', us
             </div>
 
             {/* Plan comparison */}
-            <div className="grid gap-2 mb-5" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+            <div className="grid gap-2 mb-5" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
               {PLANS.map((plan) => {
                 const isCurrent = plan.key === currentPlan
                 return (
@@ -192,19 +206,23 @@ export default function UpgradeModal({ isOpen, onClose, currentPlan = 'free', us
                     </div>
                     <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
                       <li className="text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>
-                        {typeof plan.automations === 'number' ? plan.automations : plan.automations} automations
+                        {plan.copies.toLocaleString()} copies / month
                       </li>
                       <li className="text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>
-                        {plan.templates} templates
+                        AI smart matching: {plan.aiMatching}
                       </li>
-                      <li className="text-xs" style={{ color: plan.ai ? 'var(--success)' : 'var(--text-muted)' }}>
-                        {plan.ai ? '✓ AI features' : '✗ AI features'}
+                      <li className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                        Template builder: {plan.builder}
                       </li>
                     </ul>
                   </div>
                 )
               })}
             </div>
+
+            <p className="text-xs mb-3" style={{ color: 'var(--text-muted)', margin: '0 0 12px' }}>
+              Need enterprise-scale limits, SSO, or custom support? Contact us for an Enterprise plan.
+            </p>
 
             {/* CTA */}
             <button
@@ -223,7 +241,7 @@ export default function UpgradeModal({ isOpen, onClose, currentPlan = 'free', us
                 marginBottom: 12,
               }}
             >
-              Upgrade to Pro
+              {isFreePlan ? 'Start 14-day free trial' : 'Upgrade plan'}
             </button>
             <p className="text-center text-xs mb-3" style={{ color: 'var(--text-muted)', margin: '0 0 12px' }}>
               Upgrades are handled securely through monday.com billing.

@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useWindowWidth } from "../hooks/useWindowWidth";
-import { IconPlus } from "@tabler/icons-react";
-import EmptyState from "../components/EmptyState";
+import { useDebounce } from "../hooks/useDebounce";
+import { IconPlus, IconLoader2 } from "@tabler/icons-react";
+import EmptyState, { NoTemplatesIllustration, NoSearchResultsIllustration } from "../components/EmptyState";
 import Button from "../components/Button";
-import { NoTemplatesIcon } from "../utils/icon";
 import Search from "../components/Search";
 import CreateTemplateModal from "../components/CreateTemplateModal";
 import TemplateCard from "../components/TemplateCard";
@@ -14,48 +14,91 @@ import { useToast } from "../context/ToastContext";
 import { useWorkspace } from "../context/WorkspaceContext";
 import { templateApi } from "../api/client";
 
-// Normalise server shape → component shape
+const PAGE_LIMIT = 20;
+
 function normalize(t) {
   return {
     id:        t.id,
     name:      t.name,
-    subitems:  t.subitems ?? [],   // [{ id, name, sort_order }]
+    subitems:  t.subitems ?? [],
     createdAt: new Date(t.created_at),
     copies:    t.usage_count ?? 0,
   };
 }
 
+// Number of skeleton cards based on available vertical space
+function skeletonCount(height) {
+  if (height <= 0) return 4;
+  const available = height - 200; // approx header + search bar height
+  return Math.max(2, Math.min(8, Math.floor(available / 72)));
+}
+
 export default function Templates() {
-  const width      = useWindowWidth();
-  const isMobile   = width > 0 && width < 600;
-  const toast      = useToast();
+  const width     = useWindowWidth();
+  const isMobile  = width > 0 && width < 600;
+  const toast     = useToast();
   const queryClient = useQueryClient();
   const { workspaceId, accountId } = useWorkspace();
 
   const [search, setSearch] = useState("");
   const [open,   setOpen]   = useState(false);
 
-  // Use accountId as path param if workspaceId is not yet set
-  // Backend resolves workspace via account_id from the session token anyway
-  const queryId = workspaceId || accountId;
+  const queryId       = workspaceId || accountId;
+  const loaderRef     = useRef(null);
+  const debouncedSearch = useDebounce(search, 400);
 
-  console.log("[Templates] workspaceId:", workspaceId, "accountId:", accountId, "queryId:", queryId);
-
-  // ── Fetch templates ──
-  const { data: raw, isLoading, isError } = useQuery({
-    queryKey: ["templates", queryId],
-    queryFn:  () => templateApi.list(queryId),
-    enabled:  !!queryId,
-    retry:    false,
-    staleTime: 0,
+  // ── Infinite query ──
+  const {
+    data,
+    isLoading,
+    isFetching,
+    isError,
+    isFetchingNextPage,
+    hasNextPage,
+    fetchNextPage,
+  } = useInfiniteQuery({
+    queryKey:         ["templates", queryId, debouncedSearch],
+    queryFn:          ({ pageParam = 1 }) =>
+      templateApi.list(queryId, { page: pageParam, limit: PAGE_LIMIT, search: debouncedSearch || undefined }),
+    getNextPageParam: (lastPage) =>
+      lastPage.page < lastPage.total_pages ? lastPage.page + 1 : undefined,
+    enabled:              !!queryId,
+    staleTime:            0,
+    retry:                false,
+    refetchOnWindowFocus: false,
+    refetchOnMount:       true,
   });
 
-  const templates = (raw?.templates ?? []).map(normalize);
-  const filtered  = templates.filter((t) =>
-    t.name.toLowerCase().includes(search.toLowerCase()),
+  const templates = (data?.pages ?? []).flatMap((p) => (p.templates ?? []).map(normalize));
+  const total     = data?.pages?.[0]?.total ?? 0;
+
+  // Show skeleton when: initial load OR a new debounced search term with no cached data yet
+  const isSearchChanging = search !== debouncedSearch;
+  const showSkeleton = (isFetching && templates.length === 0) || isSearchChanging;
+
+  // ── IntersectionObserver ──
+  const handleObserver = useCallback(
+    (entries) => {
+      if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
+        fetchNextPage();
+      }
+    },
+    [hasNextPage, isFetchingNextPage, fetchNextPage],
   );
 
-  // ── Create ──
+  useEffect(() => {
+    const el = loaderRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(handleObserver, { threshold: 0.1 });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [handleObserver]);
+
+  const handleSearchChange = (val) => {
+    setSearch(val);
+  };
+
+  // ── Mutations ──
   const createMutation = useMutation({
     mutationFn: (payload) => templateApi.create(queryId, payload),
     onSuccess: () => {
@@ -66,7 +109,6 @@ export default function Templates() {
     onError: () => toast.error("Failed to create template"),
   });
 
-  // ── Update ──
   const updateMutation = useMutation({
     mutationFn: ({ templateId, payload }) =>
       templateApi.update(queryId, templateId, payload),
@@ -77,7 +119,6 @@ export default function Templates() {
     onError: () => toast.error("Failed to update template"),
   });
 
-  // ── Delete ──
   const deleteMutation = useMutation({
     mutationFn: (templateId) => templateApi.remove(queryId, templateId),
     onSuccess: () => {
@@ -105,33 +146,38 @@ export default function Templates() {
     deleteMutation.mutate(templateId);
   };
 
+  // Viewport height for responsive skeleton count
+  const viewportHeight = typeof window !== "undefined" ? window.innerHeight : 0;
+  const numSkeletons   = skeletonCount(viewportHeight);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.18, ease: "easeOut" }}
-      style={{ padding: isMobile ? "16px" : "20px 24px" }}
+      style={{
+        padding:        isMobile ? "16px" : "20px 24px",
+        height:         "100vh",
+        display:        "flex",
+        flexDirection:  "column",
+        overflow:       "hidden",
+        boxSizing:      "border-box",
+      }}
     >
       {/* Header */}
       <div
         style={{
-          display: "flex",
-          alignItems: "flex-start",
-          justifyContent: "space-between",
-          gap: 12,
-          marginBottom: 20,
-          flexWrap: "wrap",
+          display:       "flex",
+          alignItems:    "flex-start",
+          justifyContent:"space-between",
+          gap:           12,
+          marginBottom:  20,
+          flexWrap:      "wrap",
+          flexShrink:    0,
         }}
       >
         <div>
-          <h1
-            style={{
-              fontSize: 20,
-              fontWeight: 500,
-              color: "var(--text-primary)",
-              margin: "0 0 4px",
-            }}
-          >
+          <h1 style={{ fontSize: 20, fontWeight: 500, color: "var(--text-primary)", margin: "0 0 4px" }}>
             Templates
           </h1>
           <p style={{ fontSize: 14, color: "var(--text-secondary)", margin: 0 }}>
@@ -144,78 +190,96 @@ export default function Templates() {
         </Button>
       </div>
 
+      {/* Search + count */}
       <div
         style={{
-          display: "flex",
-          alignItems: "center",
+          display:        "flex",
+          alignItems:     "center",
           justifyContent: "space-between",
-          gap: 10,
-          marginBottom: 16,
-          flexWrap: "wrap",
+          gap:            10,
+          marginBottom:   16,
+          flexWrap:       "wrap",
+          flexShrink:     0,
         }}
       >
         <Search
           search={search}
-          setSearch={setSearch}
+          setSearch={handleSearchChange}
           isMobile={isMobile}
           placeholder="Search templates..."
         />
         <span className="text-sm shrink-0" style={{ color: "var(--text-muted)" }}>
-          {isLoading ? "—" : `${filtered.length} template${filtered.length !== 1 ? "s" : ""}`}
+          {showSkeleton ? "—" : `${total} template${total !== 1 ? "s" : ""}`}
         </span>
       </div>
 
-      {/* Loading */}
-      {isLoading && (
-        <div className="flex flex-col gap-3">
-          <SkeletonCard />
-          <SkeletonCard />
-          <SkeletonCard />
+      {/* Skeleton — clipped, never scrolls */}
+      {showSkeleton && (
+        <div style={{ flex: 1, minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column", gap: 12 }}>
+          {Array.from({ length: numSkeletons }).map((_, i) => (
+            <SkeletonCard key={i} />
+          ))}
         </div>
       )}
 
-      {/* Error */}
-      {isError && !isLoading && (
-        <EmptyState
-          illustration={<NoTemplatesIcon />}
-          heading="Failed to load templates"
-          subtext="Could not reach the server. Please refresh the page."
-        />
+      {/* Error — centered, never scrolls */}
+      {isError && !showSkeleton && (
+        <div style={{ flex: 1, minHeight: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <EmptyState
+            illustration={<NoTemplatesIllustration />}
+            heading="Failed to load templates"
+            subtext="Could not reach the server. Please refresh the page."
+          />
+        </div>
       )}
 
-      {/* Empty */}
-      {!isLoading && !isError && filtered.length === 0 && (
-        <EmptyState
-          illustration={<NoTemplatesIcon />}
-          heading={search ? "No templates match your search" : "No templates yet"}
-          subtext={
-            search
-              ? "Try a different search term."
-              : "Create your first template to get started."
-          }
-          action={
-            !search && (
-              <Button variant="primary" onClick={() => setOpen(true)}>
-                <IconPlus size={14} />
-                Create first template
-              </Button>
-            )
-          }
-        />
+      {/* Empty — centered, never scrolls */}
+      {!showSkeleton && !isError && templates.length === 0 && (
+        <div style={{ flex: 1, minHeight: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <EmptyState
+            illustration={search ? <NoSearchResultsIllustration /> : <NoTemplatesIllustration />}
+            heading={search ? "No templates match your search" : "No templates yet"}
+            subtext={
+              search
+                ? "Try a different search term."
+                : "Create your first template to get started."
+            }
+            action={
+              !search && (
+                <Button variant="primary" onClick={() => setOpen(true)}>
+                  <IconPlus size={14} />
+                  Create first template
+                </Button>
+              )
+            }
+          />
+        </div>
       )}
 
-      {/* List */}
-      {!isLoading && !isError && filtered.length > 0 && (
-        <div className="flex flex-col gap-3">
-          {filtered.map((t) => (
-            <TemplateCard
-              key={t.id}
-              template={t}
-              onUpdate={handleUpdate}
-              onDelete={handleDelete}
-              isDeleting={deleteMutation.isPending && deleteMutation.variables === t.id}
-            />
-          ))}
+      {/* List — the only area that scrolls */}
+      {!showSkeleton && !isError && templates.length > 0 && (
+        <div style={{ flex: 1, minHeight: 0, overflowY: "auto", paddingBottom: 16 }}>
+          <div className="flex flex-col gap-3">
+            {templates.map((t) => (
+              <TemplateCard
+                key={t.id}
+                template={t}
+                onUpdate={handleUpdate}
+                onDelete={handleDelete}
+                isDeleting={deleteMutation.isPending && deleteMutation.variables === t.id}
+              />
+            ))}
+          </div>
+
+          {/* Infinite scroll sentinel */}
+          <div ref={loaderRef} style={{ height: 1 }} />
+
+          {/* Next-page spinner */}
+          {isFetchingNextPage && (
+            <div style={{ display: "flex", justifyContent: "center", padding: "16px 0" }}>
+              <IconLoader2 size={18} className="animate-spin" style={{ color: "var(--text-muted)" }} />
+            </div>
+          )}
         </div>
       )}
 

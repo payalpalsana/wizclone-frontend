@@ -62,7 +62,6 @@ export function WorkspaceProvider({ children }) {
       let sessionToken = "";
       try {
         sessionToken = (await getSessionToken()) ?? "";
-        console.log("[WorkspaceProvider] session token:", sessionToken);
       } catch {
         // non-fatal
       }
@@ -79,7 +78,6 @@ export function WorkspaceProvider({ children }) {
       setHasOAuth(oauthConnected);
       return oauthConnected;
     } catch (err) {
-      console.error("[WorkspaceProvider] refreshAuth error:", err);
       setError(err.message ?? "Auth refresh failed");
       // Don't flip hasOAuth on transient errors — caller decides what to do
       return false;
@@ -110,9 +108,8 @@ export function WorkspaceProvider({ children }) {
         let sessionToken = "";
         try {
           sessionToken = (await getSessionToken()) ?? "";
-          console.log("[WorkspaceProvider] session token:", sessionToken);
-        } catch (err) {
-          console.warn("[WorkspaceProvider] Could not get session token:", err);
+        } catch {
+          // non-fatal
         }
 
         if (cancelled) return;
@@ -129,11 +126,8 @@ export function WorkspaceProvider({ children }) {
         const oauthConnected = result?.has_oauth ?? false;
         setCachedAuth(oauthConnected);
         setHasOAuth(oauthConnected);
-
-        console.log("[WorkspaceProvider] has_oauth:", oauthConnected);
       } catch (err) {
         if (!cancelled) {
-          console.error("[WorkspaceProvider] bootstrap error:", err);
           const isAuthError = err?.message?.includes("401") || err?.message?.includes("Cannot identify");
           if (isAuthError) {
             clearAuthCache();

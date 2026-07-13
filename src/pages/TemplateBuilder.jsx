@@ -18,35 +18,34 @@ import {
   IconPlus,
   IconLoader2,
   IconCheck,
-  IconExternalLink,
 } from "@tabler/icons-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Textarea } from "../components/Input";
 import { SectionLabel } from "../components/Card";
 import { BuilderIllustration } from "../components/EmptyState";
 import { useWindowWidth } from "../hooks/useWindowWidth";
 import Button from "../components/Button";
 import SortableSubitemRow from "../components/SortableSubitemRow";
+import { useWorkspace } from "../context/WorkspaceContext";
+import { useToast } from "../context/ToastContext";
+import { templateApi } from "../api/client";
+import { sanitizeInput } from "../lib/sanitize";
+import { trackValueCreated } from "../lib/monday";
 
 let _subId = 0;
-
-const MOCK_SUBITEMS = [
-  "Define target audience and goals",
-  "Create content calendar",
-  "Design visual assets",
-  "Write copy for all platforms",
-  "Schedule and publish posts",
-  "Monitor engagement and analytics",
-  "Compile performance report",
-];
 
 export default function TemplateBuilder() {
   const width = useWindowWidth();
   const isMobile = width > 0 && width < 640;
+  const toast = useToast();
+  const queryClient = useQueryClient();
+  const { workspaceId, accountId } = useWorkspace();
+  const queryId = workspaceId || accountId;
 
   const [prompt, setPrompt] = useState("");
-  const [generationState, setGenerationState] = useState("idle");
+  const [generationState, setGenerationState] = useState("idle"); // idle | loading | done
   const [subitems, setSubitems] = useState([]);
-  const [confirmState, setConfirmState] = useState("idle");
+  const [templateName, setTemplateName] = useState("");
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -55,29 +54,62 @@ export default function TemplateBuilder() {
     }),
   );
 
-  const handleGenerate = async () => {
-    if (!prompt.trim()) return;
-    setGenerationState("loading");
-    await new Promise((r) => setTimeout(r, 1800));
-    setSubitems(MOCK_SUBITEMS.map((name) => ({ id: ++_subId, name })));
-    setGenerationState("done");
+  const generateMutation = useMutation({
+    mutationFn: (p) => templateApi.generate(queryId, p),
+    onMutate: () => setGenerationState("loading"),
+    onSuccess: (data) => {
+      const result = data?.ai_result ?? {};
+      setTemplateName(result.template_name ?? "");
+      setSubitems(
+        (result.subitems ?? []).map((name) => ({ id: ++_subId, name })),
+      );
+      setGenerationState("done");
+    },
+    onError: (err) => {
+      setGenerationState("idle");
+      toast.error(err.message || "Failed to generate subitems");
+    },
+  });
+
+  const confirmMutation = useMutation({
+    mutationFn: () =>
+      templateApi.create(queryId, {
+        name: sanitizeInput(templateName),
+        subitems: subitems
+          .filter((s) => s.name.trim())
+          .map((s, idx) => ({ name: sanitizeInput(s.name.trim()), sort_order: idx })),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["templates", queryId] });
+      toast.success("Template created");
+      setGenerationState("saved");
+      trackValueCreated(); // Fire monday value-created event
+    },
+    onError: (err) => {
+      toast.error(err.message || "Failed to create template");
+    },
+  });
+
+  const handleGenerate = () => {
+    if (!prompt.trim() || !queryId) return;
+    generateMutation.mutate(sanitizeInput(prompt.trim()));
   };
 
-  const handleRegenerate = async () => {
-    setGenerationState("loading");
-    await new Promise((r) => setTimeout(r, 1200));
-    setSubitems(
-      MOCK_SUBITEMS.slice(0, 5)
-        .reverse()
-        .map((name) => ({ id: ++_subId, name })),
-    );
-    setGenerationState("done");
+  const handleRegenerate = () => {
+    if (!prompt.trim() || !queryId) return;
+    generateMutation.mutate(sanitizeInput(prompt.trim()));
   };
 
-  const handleConfirm = async () => {
-    setConfirmState("loading");
-    await new Promise((r) => setTimeout(r, 1200));
-    setConfirmState("done");
+  const handleConfirm = () => {
+    if (!templateName.trim() || subitems.filter((s) => s.name.trim()).length === 0) return;
+    confirmMutation.mutate();
+  };
+
+  const handleReset = () => {
+    setPrompt("");
+    setSubitems([]);
+    setTemplateName("");
+    setGenerationState("idle");
   };
 
   const handleDragEnd = ({ active, over }) => {
@@ -101,6 +133,10 @@ export default function TemplateBuilder() {
   const addSubitem = () => {
     setSubitems((prev) => [...prev, { id: ++_subId, name: "" }]);
   };
+
+  const isGenerating = generationState === "loading";
+  const hasResult = generationState === "done" || generationState === "saved";
+  const isSaved = generationState === "saved";
 
   return (
     <motion.div
@@ -140,20 +176,16 @@ export default function TemplateBuilder() {
             onChange={(e) => setPrompt(e.target.value)}
             placeholder="e.g. Create a social media campaign for a product launch"
             minHeight={120}
-            disabled={generationState === "loading"}
+            disabled={isGenerating}
           />
           <Button
             onClick={handleGenerate}
             variant="primary"
-            disabled={generationState === "loading" || !prompt.trim()}
+            disabled={isGenerating || !prompt.trim() || !queryId}
             fullWidth
           >
-            {generationState === "loading" && (
-              <IconLoader2 size={14} className="animate-spin" />
-            )}
-            {generationState === "loading"
-              ? "Generating..."
-              : "Generate subitems"}
+            {isGenerating && <IconLoader2 size={14} className="animate-spin" />}
+            {isGenerating ? "Generating..." : "Generate subitems"}
           </Button>
           <p
             style={{
@@ -163,14 +195,13 @@ export default function TemplateBuilder() {
               margin: 0,
             }}
           >
-            Powered by monday.com AI Blocks. Uses AI credits from your
-            workspace.
+            Powered by Groq AI. Uses your workspace AI credits.
           </p>
         </div>
 
         {/* Right column */}
         <div>
-          {generationState === "idle" ? (
+          {generationState === "idle" && (
             <div
               className="flex flex-col items-center justify-center py-16 rounded-[10px]"
               style={{ border: "1px dashed var(--border)" }}
@@ -183,7 +214,9 @@ export default function TemplateBuilder() {
                 Your generated subitems will appear here
               </p>
             </div>
-          ) : generationState === "loading" ? (
+          )}
+
+          {isGenerating && (
             <div
               className="flex flex-col gap-2 p-4 rounded-[10px]"
               style={{
@@ -199,7 +232,9 @@ export default function TemplateBuilder() {
                 />
               ))}
             </div>
-          ) : confirmState === "done" ? (
+          )}
+
+          {isSaved && (
             <motion.div
               initial={{ opacity: 0, scale: 0.97 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -224,23 +259,21 @@ export default function TemplateBuilder() {
                 className="text-sm font-medium mb-1"
                 style={{ color: "var(--text-primary)" }}
               >
-                Template created on your template board
+                Template created successfully
               </h3>
               <p
                 className="text-xs mb-4"
                 style={{ color: "var(--text-secondary)" }}
               >
-                {subitems.length} subitems added to "Generated Template"
+                "{templateName}" — {subitems.filter((s) => s.name.trim()).length} subitems saved
               </p>
-              <a
-                href="#"
-                className="inline-flex items-center gap-1 text-xs font-medium"
-                style={{ color: "var(--accent)", textDecoration: "none" }}
-              >
-                Open in monday.com <IconExternalLink size={11} />
-              </a>
+              <Button variant="secondary" onClick={handleReset}>
+                Build another template
+              </Button>
             </motion.div>
-          ) : (
+          )}
+
+          {hasResult && !isSaved && (
             <div
               className="rounded-[10px] p-4"
               style={{
@@ -248,6 +281,31 @@ export default function TemplateBuilder() {
                 backgroundColor: "var(--bg-primary)",
               }}
             >
+              {/* Template name */}
+              {templateName && (
+                <div style={{ marginBottom: 12 }}>
+                  <p style={{ fontSize: 11, fontWeight: 500, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 4px" }}>
+                    Template name
+                  </p>
+                  <input
+                    value={templateName}
+                    onChange={(e) => setTemplateName(e.target.value)}
+                    style={{
+                      width: "100%",
+                      padding: "6px 10px",
+                      borderRadius: 6,
+                      border: "1px solid var(--border)",
+                      backgroundColor: "var(--bg-secondary)",
+                      color: "var(--text-primary)",
+                      fontSize: 13,
+                      fontFamily: "inherit",
+                      outline: "none",
+                      boxSizing: "border-box",
+                    }}
+                  />
+                </div>
+              )}
+
               <SectionLabel>Generated Subitems</SectionLabel>
               <DndContext
                 sensors={sensors}
@@ -296,16 +354,22 @@ export default function TemplateBuilder() {
                   onClick={handleConfirm}
                   variant="primary"
                   fullWidth
-                  disabled={confirmState === "loading"}
+                  disabled={
+                    confirmMutation.isPending ||
+                    !templateName.trim() ||
+                    subitems.filter((s) => s.name.trim()).length === 0
+                  }
                 >
-                  {confirmState === "loading" && (
+                  {confirmMutation.isPending && (
                     <IconLoader2 size={14} className="animate-spin" />
                   )}
-                  {confirmState === "loading"
-                    ? "Creating..."
-                    : "Confirm & create template"}
+                  {confirmMutation.isPending ? "Creating..." : "Confirm & create template"}
                 </Button>
-                <Button variant="secondary" onClick={handleRegenerate}>
+                <Button
+                  variant="secondary"
+                  onClick={handleRegenerate}
+                  disabled={isGenerating || confirmMutation.isPending}
+                >
                   Regenerate
                 </Button>
               </div>

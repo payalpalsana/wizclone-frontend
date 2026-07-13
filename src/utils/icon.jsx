@@ -1,9 +1,10 @@
 export const NoTemplatesIcon = () => {
   return (
     <svg
-      width="300"
-      height="508"
+      width="100%"
+      height="100%"
       viewBox="0 0 1164 1764"
+      style={{ display: "block" }}
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
     >
@@ -638,8 +639,9 @@ export const EmptyStateIcon = () => {
       xmlns:xlink="http://www.w3.org/1999/xlink"
       x="0px"
       y="0px"
-      width="200"
-      height="308"
+      width="100%"
+      height="100%"
+      style={{ display: "block" }}
       viewBox="0 0 700 500"
       // style="enable-background:new 0 0 700 500;"
       xml:space="preserve"

@@ -18,8 +18,9 @@ function buildOAuthUrl() {
   const params = new URLSearchParams({
     client_id: import.meta.env.VITE_CLIENT_ID,
     redirect_uri: redirectUri,
-    scope:
-      "me:read boards:read boards:write workspaces:read users:read account:read webhooks:write webhooks:read",
+    scope: "me:read boards:read boards:write workspaces:read account:read webhooks:write",
+    // scope:
+    //   "me:read boards:read boards:write workspaces:read users:read account:read webhooks:write webhooks:read",
   });
 
   return `https://auth.monday.com/oauth2/authorize?${params.toString()}`;
@@ -64,7 +65,6 @@ export default function Onboard() {
     setStatus("loading");
 
     const oauthUrl = buildOAuthUrl();
-    console.log("[Onboard] AUTH URL:", oauthUrl);
 
     try {
       await monday.execute("openLinkInTab", { url: oauthUrl });

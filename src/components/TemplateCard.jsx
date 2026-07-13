@@ -1,16 +1,15 @@
 import { AnimatePresence } from "framer-motion";
 import TemplateEditor from "./TemplateEditor";
 import {
-  IconCheck,
   IconChevronDown,
   IconChevronUp,
   IconEdit,
   IconTrash,
-  IconX,
 } from "@tabler/icons-react";
 import { useState } from "react";
 import Badge from "./Badge";
 import { motion } from "framer-motion";
+import DeleteConfirmModal from "./DeleteConfirmModal";
 
 function relDate(date) {
   const diff = Date.now() - new Date(date).getTime();
@@ -33,7 +32,7 @@ const TemplateCard = ({ template, onUpdate, onDelete, isDeleting }) => {
 
   const handleDelete = () => {
     onDelete(template.id);
-    setConfirmDelete(false);
+    // Modal stays open — isDeleting shows the loader; card unmounts on success
   };
 
   const expandToggle = (e) => {
@@ -121,70 +120,47 @@ const TemplateCard = ({ template, onUpdate, onDelete, isDeleting }) => {
             <IconEdit size={13} />
           </button>
 
-          {!confirmDelete ? (
-            <button
-              type="button"
-              title="Delete template"
-              disabled={isDeleting}
-              onClick={(e) => {
-                e.stopPropagation();
-                setConfirmDelete(true);
-              }}
-              style={{
-                width: 30, height: 30,
-                borderRadius: 6,
-                border: "1px solid var(--border)",
-                backgroundColor: "transparent",
-                color: "var(--text-secondary)",
-                cursor: isDeleting ? "not-allowed" : "pointer",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                transition: "background-color 120ms, color 120ms",
-              }}
-              onMouseEnter={(e) => {
-                if (!isDeleting) {
-                  e.currentTarget.style.backgroundColor = "var(--danger-light)";
-                  e.currentTarget.style.color = "var(--danger)";
-                }
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "transparent";
-                e.currentTarget.style.color = "var(--text-secondary)";
-              }}
-            >
-              <IconTrash size={13} />
-            </button>
-          ) : (
-            <div className="flex items-center gap-1">
-              <span className="text-xs" style={{ color: "var(--danger)", whiteSpace: "nowrap" }}>
-                Delete?
-              </span>
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); handleDelete(); }}
-                style={{
-                  width: 26, height: 26, borderRadius: 5, border: "none",
-                  backgroundColor: "var(--danger)", color: "#fff",
-                  cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-                }}
-              >
-                <IconCheck size={12} />
-              </button>
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); setConfirmDelete(false); }}
-                style={{
-                  width: 26, height: 26, borderRadius: 5,
-                  border: "1px solid var(--border)", backgroundColor: "transparent",
-                  color: "var(--text-muted)", cursor: "pointer",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                }}
-              >
-                <IconX size={12} />
-              </button>
-            </div>
-          )}
+          <button
+            type="button"
+            title="Delete template"
+            disabled={isDeleting}
+            onClick={(e) => {
+              e.stopPropagation();
+              setConfirmDelete(true);
+            }}
+            style={{
+              width: 30, height: 30,
+              borderRadius: 6,
+              border: "1px solid var(--border)",
+              backgroundColor: "transparent",
+              color: "var(--text-secondary)",
+              cursor: isDeleting ? "not-allowed" : "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              transition: "background-color 120ms, color 120ms",
+            }}
+            onMouseEnter={(e) => {
+              if (!isDeleting) {
+                e.currentTarget.style.backgroundColor = "var(--danger-light)";
+                e.currentTarget.style.color = "var(--danger)";
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = "transparent";
+              e.currentTarget.style.color = "var(--text-secondary)";
+            }}
+          >
+            <IconTrash size={13} />
+          </button>
         </div>
       </div>
+
+      <DeleteConfirmModal
+        open={confirmDelete}
+        templateName={template.name}
+        isDeleting={isDeleting}
+        onConfirm={handleDelete}
+        onClose={() => setConfirmDelete(false)}
+      />
 
       <AnimatePresence>
         {/* Subitem list (read-only expand) */}

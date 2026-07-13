@@ -42,8 +42,8 @@ client.interceptors.request.use(async (config) => {
   try {
     const token = await getCachedToken();
     if (token) config.headers["Authorization"] = `Bearer ${token}`;
-  } catch (err) {
-    console.warn("[API Client] Could not get session token:", err);
+  } catch {
+    // non-fatal - request proceeds without auth header
   }
   return config;
 });
@@ -62,8 +62,9 @@ export const authApi = {
 };
 
 export const settingsApi = {
-  get: (workspaceId) => client.post(`/settings/load`, { workspaceId }),
-  save: (workspaceId, data) => client.post(`/settings/save`, { workspaceId, ...data }),
+  get:         (workspaceId)           => client.post(`/settings/load`, { workspaceId }),
+  save:        (workspaceId, data)     => client.post(`/settings/save`, { workspaceId, ...data }),
+  deleteBoard: (workspaceId, boardId)  => client.delete(`/settings/${workspaceId}/boards/${boardId}`),
 };
 
 export const activityApi = {
@@ -71,10 +72,11 @@ export const activityApi = {
 };
 
 export const templateApi = {
-  list:   (workspaceId)                    => client.get(`/templates/${workspaceId}`),
-  create: (workspaceId, data)              => client.post(`/templates/${workspaceId}`, data),
-  update: (workspaceId, templateId, data)  => client.put(`/templates/${workspaceId}/${templateId}`, data),
-  remove: (workspaceId, templateId)        => client.delete(`/templates/${workspaceId}/${templateId}`),
+  list:     (workspaceId, params)            => client.get(`/templates/${workspaceId}`, { params }),
+  create:   (workspaceId, data)             => client.post(`/templates/${workspaceId}`, data),
+  update:   (workspaceId, templateId, data) => client.put(`/templates/${workspaceId}/${templateId}`, data),
+  remove:   (workspaceId, templateId)       => client.delete(`/templates/${workspaceId}/${templateId}`),
+  generate: (workspaceId, prompt)           => client.post(`/generate_template/${workspaceId}`, { prompt }),
 };
 
 export const plansApi = {
