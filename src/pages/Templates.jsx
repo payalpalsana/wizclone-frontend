@@ -26,12 +26,8 @@ function normalize(t) {
   };
 }
 
-// Number of skeleton cards based on available vertical space
-function skeletonCount(height) {
-  if (height <= 0) return 4;
-  const available = height - 200; // approx header + search bar height
-  return Math.max(2, Math.min(8, Math.floor(available / 72)));
-}
+// Fixed skeleton count — small enough to never overflow the iframe panel
+const NUM_SKELETONS = 3;
 
 export default function Templates() {
   const width     = useWindowWidth();
@@ -146,10 +142,6 @@ export default function Templates() {
     deleteMutation.mutate(templateId);
   };
 
-  // Viewport height for responsive skeleton count
-  const viewportHeight = typeof window !== "undefined" ? window.innerHeight : 0;
-  const numSkeletons   = skeletonCount(viewportHeight);
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 4 }}
@@ -213,10 +205,9 @@ export default function Templates() {
         </span>
       </div>
 
-      {/* Skeleton - clipped, never scrolls */}
       {showSkeleton && (
         <div style={{ flex: 1, minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column", gap: 12 }}>
-          {Array.from({ length: numSkeletons }).map((_, i) => (
+          {Array.from({ length: NUM_SKELETONS }).map((_, i) => (
             <SkeletonCard key={i} />
           ))}
         </div>
