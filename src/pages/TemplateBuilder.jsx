@@ -282,7 +282,7 @@ export default function TemplateBuilder() {
                   className="text-xs mb-4"
                   style={{ color: "var(--text-secondary)" }}
                 >
-                  "{templateName}" — {subitems.filter((s) => s.name.trim()).length} subitems saved
+                  "{templateName}" - {subitems.filter((s) => s.name.trim()).length} subitems saved
                 </p>
                 <Button variant="secondary" onClick={handleReset}>
                   Build another template

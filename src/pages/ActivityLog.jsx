@@ -22,7 +22,7 @@ const STATUS_MAP = {
 function ConfidencePill({ confidence, matchMethod, aiFallback }) {
   const isExact = matchMethod === "EXACT_MATCH" && !aiFallback;
   if (isExact) return <Badge variant="blue">Exact match</Badge>;
-  if (confidence == null) return <span style={{ color: "var(--text-muted)" }}>—</span>;
+  if (confidence == null) return <span style={{ color: "var(--text-muted)" }}>-</span>;
   const variant = confidence >= 75 ? "success" : confidence >= 55 ? "warning" : "danger";
   return <Badge variant={variant}>{confidence}%</Badge>;
 }
@@ -115,7 +115,7 @@ function LogTableRow({ log }) {
         </td>
         <td style={{ padding: "11px 16px" }}>
           <span className="text-sm" style={{ color: log.template_matched ? "var(--text-secondary)" : "var(--text-muted)" }}>
-            {log.template_matched || "—"}
+            {log.template_matched || "-"}
           </span>
         </td>
         <td style={{ padding: "11px 16px" }}>
@@ -301,21 +301,21 @@ export default function ActivityLog() {
         <Search search={search} setSearch={handleSearchChange} isMobile={isMobile} placeholder="Search automations..." />
       </div>
 
-      {/* Skeleton — clipped, never scrolls */}
+      {/* Skeleton - clipped, never scrolls */}
       {isLoading && (
         <div style={{ flex: 1, minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column", gap: 12, paddingBottom: 16 }}>
           <SkeletonCard /><SkeletonCard /><SkeletonCard />
         </div>
       )}
 
-      {/* Error — centered, never scrolls */}
+      {/* Error - centered, never scrolls */}
       {isError && !isLoading && (
         <div style={{ flex: 1, minHeight: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
           <EmptyState illustration={<NoActivityIllustration />} heading="Failed to load activity" subtext="Could not reach the server. Please refresh the page." />
         </div>
       )}
 
-      {/* Empty — centered, never scrolls */}
+      {/* Empty - centered, never scrolls */}
       {!isLoading && !isError && items.length === 0 && (
         <div style={{ flex: 1, minHeight: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
           <EmptyState
@@ -326,7 +326,7 @@ export default function ActivityLog() {
         </div>
       )}
 
-      {/* Data — scrolls inside a flex column */}
+      {/* Data - scrolls inside a flex column */}
       {!isLoading && !isError && items.length > 0 && (
         <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
           {isMobile ? (

@@ -10,7 +10,7 @@
  *  2. Close this tab automatically.
  *
  * BroadcastChannel is supported in all modern browsers and works between any
- * same-origin contexts — including cross-tab → iframe communication.
+ * same-origin contexts - including cross-tab → iframe communication.
  */
 import { useEffect } from "react";
 
@@ -21,7 +21,7 @@ export default function AuthSuccess() {
       channel.postMessage({ type: "oauth_complete" });
       channel.close();
     } catch (e) {
-      // BroadcastChannel not supported — polling in Onboard.jsx will catch it
+      // BroadcastChannel not supported - polling in Onboard.jsx will catch it
       console.warn("BroadcastChannel not available:", e);
     }
 

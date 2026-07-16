@@ -32,7 +32,7 @@ const TemplateCard = ({ template, onUpdate, onDelete, isDeleting }) => {
 
   const handleDelete = () => {
     onDelete(template.id);
-    // Modal stays open — isDeleting shows the loader; card unmounts on success
+    // Modal stays open - isDeleting shows the loader; card unmounts on success
   };
 
   const expandToggle = (e) => {

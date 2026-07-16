@@ -8,7 +8,7 @@ const client = axios.create({
 
 // monday.com session tokens are JWTs valid for 24 hours and are re-generated
 // only on a full app reload (hard refresh clears JS module state anyway).
-// We cache for the tab lifetime — no TTL needed. This prevents stalling every
+// We cache for the tab lifetime - no TTL needed. This prevents stalling every
 // API call on the SDK iframe handshake, which on hard refresh can take 2-5s.
 let _cachedToken = null;
 let _tokenPromise = null;

@@ -209,11 +209,11 @@ export default function Templates() {
           placeholder="Search templates..."
         />
         <span className="text-sm shrink-0" style={{ color: "var(--text-muted)" }}>
-          {showSkeleton ? "—" : `${total} template${total !== 1 ? "s" : ""}`}
+          {showSkeleton ? "-" : `${total} template${total !== 1 ? "s" : ""}`}
         </span>
       </div>
 
-      {/* Skeleton — clipped, never scrolls */}
+      {/* Skeleton - clipped, never scrolls */}
       {showSkeleton && (
         <div style={{ flex: 1, minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column", gap: 12 }}>
           {Array.from({ length: numSkeletons }).map((_, i) => (
@@ -222,7 +222,7 @@ export default function Templates() {
         </div>
       )}
 
-      {/* Error — centered, never scrolls */}
+      {/* Error - centered, never scrolls */}
       {isError && !showSkeleton && (
         <div style={{ flex: 1, minHeight: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
           <EmptyState
@@ -233,7 +233,7 @@ export default function Templates() {
         </div>
       )}
 
-      {/* Empty — centered, never scrolls */}
+      {/* Empty - centered, never scrolls */}
       {!showSkeleton && !isError && templates.length === 0 && (
         <div style={{ flex: 1, minHeight: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
           <EmptyState
@@ -256,7 +256,7 @@ export default function Templates() {
         </div>
       )}
 
-      {/* List — the only area that scrolls */}
+      {/* List - the only area that scrolls */}
       {!showSkeleton && !isError && templates.length > 0 && (
         <div style={{ flex: 1, minHeight: 0, overflowY: "auto", paddingBottom: 16 }}>
           <div className="flex flex-col gap-3">

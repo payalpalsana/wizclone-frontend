@@ -63,7 +63,7 @@ export function WorkspaceProvider({ children }) {
       return oauthConnected;
     } catch (err) {
       if (!silent) setError(err.message ?? "Auth refresh failed");
-      // Don't flip hasOAuth on transient errors — caller decides what to do
+      // Don't flip hasOAuth on transient errors - caller decides what to do
       return false;
     } finally {
       if (!silent) setLoading(false);

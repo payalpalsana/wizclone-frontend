@@ -8,14 +8,14 @@ import { useWorkspace } from "../context/WorkspaceContext";
 import monday from "../lib/monday";
 
 function buildOAuthUrl() {
-  // VITE_API_BASE_URL may or may not end in /api — use VITE_BACKEND_URL for the
+  // VITE_API_BASE_URL may or may not end in /api - use VITE_BACKEND_URL for the
   // raw origin so the callback path is always exactly /api/auth/callback.
   const backendOrigin =
     import.meta.env.VITE_BACKEND_URL ||
     import.meta.env.VITE_API_BASE_URL?.replace(/\/api\/?$/, "");
   const redirectUri = `${backendOrigin}/api/auth/callback`;
 
-  // The frontend success page — backend should redirect here after token exchange.
+  // The frontend success page - backend should redirect here after token exchange.
   // We encode it in the `state` param so the backend knows where to send the user.
   // Your backend's /api/auth/callback handler should:
   //   1. Exchange the code for a token
@@ -69,7 +69,7 @@ export default function Onboard() {
       }
     };
 
-    // SIGNAL 1: BroadcastChannel — fires instantly when /auth-success page loads.
+    // SIGNAL 1: BroadcastChannel - fires instantly when /auth-success page loads.
     // Requires backend to redirect to `<frontend>/auth-success` after token exchange.
     let channel = null;
     try {
@@ -80,10 +80,10 @@ export default function Onboard() {
         }
       };
     } catch {
-      // BroadcastChannel not supported — rely on other signals
+      // BroadcastChannel not supported - rely on other signals
     }
 
-    // SIGNAL 2: monday.com context listener — fires when the monday.com SDK
+    // SIGNAL 2: monday.com context listener - fires when the monday.com SDK
     // sends a fresh context to the iframe. This happens when the user returns
     // to the monday.com tab after completing OAuth in a separate tab.
     // This is the official monday.com SDK mechanism for cross-tab signalling.
@@ -93,10 +93,10 @@ export default function Onboard() {
         handleAuthComplete();
       });
     } catch {
-      // SDK not ready — ignore
+      // SDK not ready - ignore
     }
 
-    // SIGNAL 3: Polling fallback — slow backup for edge cases
+    // SIGNAL 3: Polling fallback - slow backup for edge cases
     pollTimer = setInterval(async () => {
       attempts++;
       await handleAuthComplete();
