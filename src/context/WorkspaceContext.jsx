@@ -34,8 +34,8 @@ export function WorkspaceProvider({ children }) {
 
   // Called after OAuth completes on the Onboard page
   // so the app re-checks without a full page reload
-  const refreshAuth = useCallback(async () => {
-    setLoading(true);
+  const refreshAuth = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     setError(null);
 
     try {
@@ -62,11 +62,11 @@ export function WorkspaceProvider({ children }) {
       setHasOAuth(oauthConnected);
       return oauthConnected;
     } catch (err) {
-      setError(err.message ?? "Auth refresh failed");
+      if (!silent) setError(err.message ?? "Auth refresh failed");
       // Don't flip hasOAuth on transient errors — caller decides what to do
       return false;
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, []);
 

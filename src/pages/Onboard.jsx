@@ -15,12 +15,23 @@ function buildOAuthUrl() {
     import.meta.env.VITE_API_BASE_URL?.replace(/\/api\/?$/, "");
   const redirectUri = `${backendOrigin}/api/auth/callback`;
 
+  // The frontend success page — backend should redirect here after token exchange.
+  // We encode it in the `state` param so the backend knows where to send the user.
+  // Your backend's /api/auth/callback handler should:
+  //   1. Exchange the code for a token
+  //   2. Store the token in the database
+  //   3. Redirect to: JSON.parse(decodeURIComponent(state)).successUrl
+  const frontendOrigin =
+    import.meta.env.VITE_FRONTEND_URL || window.location.origin;
+  const state = encodeURIComponent(
+    JSON.stringify({ successUrl: `${frontendOrigin}/auth-success` })
+  );
+
   const params = new URLSearchParams({
     client_id: import.meta.env.VITE_CLIENT_ID,
     redirect_uri: redirectUri,
     scope: "me:read boards:read boards:write workspaces:read account:read webhooks:write",
-    // scope:
-    //   "me:read boards:read boards:write workspaces:read users:read account:read webhooks:write webhooks:read",
+    state,
   });
 
   return `https://auth.monday.com/oauth2/authorize?${params.toString()}`;
@@ -36,30 +47,83 @@ export default function Onboard() {
   useEffect(() => {
     if (status !== "loading") return;
 
+    let pollTimer = null;
     let attempts = 0;
-    const MAX = 24;
+    const MAX = 120; // 5-minute polling fallback
     const DELAY = 2500;
+    let isChecking = false; // guard against concurrent calls
 
-    const timer = setInterval(async () => {
-      attempts++;
+    const handleAuthComplete = async () => {
+      if (isChecking) return;
+      isChecking = true;
       try {
-        const connected = await refreshAuth();
+        const connected = await refreshAuth(true);
         if (connected) {
           setStatus("success");
-          clearInterval(timer);
           navigate("/settings", { replace: true });
         }
       } catch {
-        // keep polling
+        // ignore
+      } finally {
+        isChecking = false;
       }
+    };
+
+    // SIGNAL 1: BroadcastChannel — fires instantly when /auth-success page loads.
+    // Requires backend to redirect to `<frontend>/auth-success` after token exchange.
+    let channel = null;
+    try {
+      channel = new BroadcastChannel("wc_oauth");
+      channel.onmessage = (event) => {
+        if (event.data?.type === "oauth_complete") {
+          handleAuthComplete();
+        }
+      };
+    } catch {
+      // BroadcastChannel not supported — rely on other signals
+    }
+
+    // SIGNAL 2: monday.com context listener — fires when the monday.com SDK
+    // sends a fresh context to the iframe. This happens when the user returns
+    // to the monday.com tab after completing OAuth in a separate tab.
+    // This is the official monday.com SDK mechanism for cross-tab signalling.
+    let contextUnsub = null;
+    try {
+      contextUnsub = monday.listen("context", () => {
+        handleAuthComplete();
+      });
+    } catch {
+      // SDK not ready — ignore
+    }
+
+    // SIGNAL 3: Polling fallback — slow backup for edge cases
+    pollTimer = setInterval(async () => {
+      attempts++;
+      await handleAuthComplete();
       if (attempts >= MAX) {
-        clearInterval(timer);
+        clearInterval(pollTimer);
         setStatus("error");
       }
     }, DELAY);
 
-    return () => clearInterval(timer);
+    return () => {
+      channel?.close();
+      if (typeof contextUnsub === "function") contextUnsub();
+      clearInterval(pollTimer);
+    };
   }, [status, refreshAuth, navigate]);
+
+
+  const forceCheck = () => {
+    if (status === "loading") {
+      refreshAuth(true).then(connected => {
+        if (connected) {
+          setStatus("success");
+          navigate("/settings", { replace: true });
+        }
+      });
+    }
+  };
 
   const handleConnect = async () => {
     setStatus("loading");
@@ -162,16 +226,26 @@ export default function Onboard() {
 
           {/* Loading hint */}
           {status === "loading" && (
-            <p
-              style={{
-                fontSize: 12,
-                color: "var(--text-muted)",
-                marginBottom: 12,
-              }}
-            >
-              A monday.com authorization window has opened. Approve it to
-              continue.
-            </p>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, marginBottom: 16 }}>
+              <p style={{ fontSize: 13, color: "var(--text-muted)", margin: 0 }}>
+                A monday.com authorization window has opened. Approve it to continue.
+              </p>
+              <button
+                onClick={forceCheck}
+                style={{
+                  background: "transparent",
+                  border: "1px solid var(--border)",
+                  color: "var(--text-primary)",
+                  padding: "6px 14px",
+                  borderRadius: 6,
+                  fontSize: 13,
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                }}
+              >
+                I have approved it
+              </button>
+            </div>
           )}
 
           {/* Error */}

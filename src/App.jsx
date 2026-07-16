@@ -7,6 +7,7 @@ import ActivityLog from "./pages/ActivityLog";
 import Templates from "./pages/Templates";
 import TemplateBuilder from "./pages/TemplateBuilder";
 import Help from "./pages/Help";
+import AuthSuccess from "./pages/AuthSuccess";
 import UpgradeModal from "./components/UpgradeModal";
 import { useWorkspace } from "./context/WorkspaceContext";
 import { IconLoader2, IconAlertTriangle, IconLock } from "@tabler/icons-react";
@@ -177,6 +178,7 @@ export default function App() {
     <>
       <Routes>
         <Route path="/onboard" element={<Onboard />} />
+        <Route path="/auth-success" element={<AuthSuccess />} />
 
         <Route
           element={
