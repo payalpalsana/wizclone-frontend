@@ -8,50 +8,33 @@ import {
 import { getContext, getSessionToken } from "../lib/monday";
 import { authApi } from "../api/client";
 
-// ─────────────────────────────────────────────────────────────
-// Auth cache — localStorage so it persists across tabs and
-// browser restarts. Cache is only trusted for 30 minutes to
-// avoid serving stale state after a revoke/uninstall.
-// ─────────────────────────────────────────────────────────────
-const CACHE_KEY   = "wc_auth_v2";
-const CACHE_TTL   = 30 * 60 * 1000; // 30 minutes
+const WorkspaceContext = createContext(null);
 
-export function clearAuthCache() {
-  localStorage.removeItem(CACHE_KEY);
-}
-
-function getCachedAuth() {
+function decodeSessionToken(token) {
   try {
-    const raw = localStorage.getItem(CACHE_KEY);
-    if (!raw) return null;
-    const { value, ts } = JSON.parse(raw);
-    if (Date.now() - ts > CACHE_TTL) { localStorage.removeItem(CACHE_KEY); return null; }
-    return value; // boolean
-  } catch {
-    return null;
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+    }).join(''));
+    return JSON.parse(jsonPayload);
+  } catch (e) {
+    return {};
   }
 }
-
-function setCachedAuth(value) {
-  try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify({ value, ts: Date.now() }));
-  } catch { /* storage quota — ignore */ }
-}
-
-const WorkspaceContext = createContext(null);
 
 export function WorkspaceProvider({ children }) {
   const [workspaceId, setWorkspaceId] = useState(null);
   const [accountId, setAccountId] = useState(null);
   const [userId, setUserId] = useState(null);
   const [hasOAuth, setHasOAuth] = useState(null);
+  const [isViewOnly, setIsViewOnly] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   // Called after OAuth completes on the Onboard page
   // so the app re-checks without a full page reload
   const refreshAuth = useCallback(async () => {
-    clearAuthCache();
     setLoading(true);
     setError(null);
 
@@ -62,6 +45,8 @@ export function WorkspaceProvider({ children }) {
       let sessionToken = "";
       try {
         sessionToken = (await getSessionToken()) ?? "";
+        const payload = decodeSessionToken(sessionToken);
+        if (payload?.isViewOnly || payload?.dat?.isViewOnly || payload?.is_view_only || payload?.dat?.is_view_only) setIsViewOnly(true);
       } catch {
         // non-fatal
       }
@@ -74,7 +59,6 @@ export function WorkspaceProvider({ children }) {
       });
 
       const oauthConnected = result?.has_oauth ?? false;
-      setCachedAuth(oauthConnected);
       setHasOAuth(oauthConnected);
       return oauthConnected;
     } catch (err) {
@@ -99,15 +83,11 @@ export function WorkspaceProvider({ children }) {
         setAccountId(data.account?.id ?? null);
         setUserId(data.user?.id ?? null);
 
-        const cached = getCachedAuth();
-        if (cached !== null) {
-          setHasOAuth(cached);
-          return;
-        }
-
         let sessionToken = "";
         try {
           sessionToken = (await getSessionToken()) ?? "";
+          const payload = decodeSessionToken(sessionToken);
+          if (payload?.isViewOnly || payload?.dat?.isViewOnly || payload?.is_view_only || payload?.dat?.is_view_only) setIsViewOnly(true);
         } catch {
           // non-fatal
         }
@@ -124,13 +104,11 @@ export function WorkspaceProvider({ children }) {
         if (cancelled) return;
 
         const oauthConnected = result?.has_oauth ?? false;
-        setCachedAuth(oauthConnected);
         setHasOAuth(oauthConnected);
       } catch (err) {
         if (!cancelled) {
           const isAuthError = err?.message?.includes("401") || err?.message?.includes("Cannot identify");
           if (isAuthError) {
-            clearAuthCache();
             setHasOAuth(false);
           } else {
             const isTimeout = err?.message?.toLowerCase().includes("timeout");
@@ -164,10 +142,10 @@ export function WorkspaceProvider({ children }) {
         accountId,
         userId,
         hasOAuth,
+        isViewOnly,
         loading,
         error,
         refreshAuth,
-        clearAuthCache,
       }}
     >
       {children}

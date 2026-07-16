@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   DndContext,
   closestCenter,
@@ -83,7 +83,7 @@ export default function TemplateBuilder() {
       queryClient.invalidateQueries({ queryKey: ["templates", queryId] });
       toast.success("Template created");
       setGenerationState("saved");
-      trackValueCreated(); // Fire monday value-created event
+      trackValueCreated(); 
     },
     onError: (err) => {
       toast.error(err.message || "Failed to create template");
@@ -100,8 +100,11 @@ export default function TemplateBuilder() {
     generateMutation.mutate(sanitizeInput(prompt.trim()));
   };
 
+  const hasValidSubitems = subitems.some((s) => s.name.trim() !== "");
+  const isValid = templateName.trim() !== "" && hasValidSubitems;
+
   const handleConfirm = () => {
-    if (!templateName.trim() || subitems.filter((s) => s.name.trim()).length === 0) return;
+    if (!isValid) return;
     confirmMutation.mutate();
   };
 
@@ -200,87 +203,106 @@ export default function TemplateBuilder() {
         </div>
 
         {/* Right column */}
-        <div>
-          {generationState === "idle" && (
-            <div
-              className="flex flex-col items-center justify-center py-16 rounded-[10px]"
-              style={{ border: "1px dashed var(--border)" }}
-            >
-              <BuilderIllustration />
-              <p
-                className="mt-3 text-sm"
-                style={{ color: "var(--text-muted)", textAlign: "center" }}
+        <div style={{ position: "relative" }}>
+          <AnimatePresence mode="wait">
+            {generationState === "idle" && (
+              <motion.div
+                key="idle"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+                className="flex flex-col items-center justify-center py-16 rounded-[10px]"
+                style={{ border: "1px dashed var(--border)" }}
               >
-                Your generated subitems will appear here
-              </p>
-            </div>
-          )}
+                <BuilderIllustration />
+                <p
+                  className="mt-3 text-sm"
+                  style={{ color: "var(--text-muted)", textAlign: "center" }}
+                >
+                  Your generated subitems will appear here
+                </p>
+              </motion.div>
+            )}
 
-          {isGenerating && (
-            <div
-              className="flex flex-col gap-2 p-4 rounded-[10px]"
-              style={{
-                border: "1px solid var(--border)",
-                backgroundColor: "var(--bg-primary)",
-              }}
-            >
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="skeleton-shimmer rounded"
-                  style={{ height: 36, borderRadius: 8 }}
-                />
-              ))}
-            </div>
-          )}
-
-          {isSaved && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.97 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="flex flex-col items-center text-center p-6 rounded-[10px]"
-              style={{
-                backgroundColor: "var(--success-light)",
-                border: "1px solid rgba(15,155,110,0.2)",
-              }}
-            >
-              <div
-                className="flex items-center justify-center mb-3"
+            {isGenerating && (
+              <motion.div
+                key="loading"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+                className="flex flex-col gap-2 p-4 rounded-[10px]"
                 style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: "50%",
-                  backgroundColor: "var(--success)",
+                  border: "1px solid var(--border)",
+                  backgroundColor: "var(--bg-primary)",
                 }}
               >
-                <IconCheck size={20} color="#fff" />
-              </div>
-              <h3
-                className="text-sm font-medium mb-1"
-                style={{ color: "var(--text-primary)" }}
-              >
-                Template created successfully
-              </h3>
-              <p
-                className="text-xs mb-4"
-                style={{ color: "var(--text-secondary)" }}
-              >
-                "{templateName}" — {subitems.filter((s) => s.name.trim()).length} subitems saved
-              </p>
-              <Button variant="secondary" onClick={handleReset}>
-                Build another template
-              </Button>
-            </motion.div>
-          )}
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="skeleton-shimmer rounded"
+                    style={{ height: 36, borderRadius: 8 }}
+                  />
+                ))}
+              </motion.div>
+            )}
 
-          {hasResult && !isSaved && (
-            <div
-              className="rounded-[10px] p-4"
-              style={{
-                border: "1px solid var(--border)",
-                backgroundColor: "var(--bg-primary)",
-              }}
-            >
+            {isSaved && (
+              <motion.div
+                key="saved"
+                initial={{ opacity: 0, scale: 0.97 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.97 }}
+                transition={{ duration: 0.2 }}
+                className="flex flex-col items-center text-center p-6 rounded-[10px]"
+                style={{
+                  backgroundColor: "var(--success-light)",
+                  border: "1px solid rgba(15,155,110,0.2)",
+                }}
+              >
+                <div
+                  className="flex items-center justify-center mb-3"
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: "50%",
+                    backgroundColor: "var(--success)",
+                  }}
+                >
+                  <IconCheck size={20} color="#fff" />
+                </div>
+                <h3
+                  className="text-sm font-medium mb-1"
+                  style={{ color: "var(--text-primary)" }}
+                >
+                  Template created successfully
+                </h3>
+                <p
+                  className="text-xs mb-4"
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  "{templateName}" — {subitems.filter((s) => s.name.trim()).length} subitems saved
+                </p>
+                <Button variant="secondary" onClick={handleReset}>
+                  Build another template
+                </Button>
+              </motion.div>
+            )}
+
+            {hasResult && !isSaved && (
+              <motion.div
+                key="result"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+                className="rounded-[10px] p-4"
+                style={{
+                  border: "1px solid var(--border)",
+                  backgroundColor: "var(--bg-primary)",
+                }}
+              >
               {/* Template name */}
               {templateName && (
                 <div style={{ marginBottom: 12 }}>
@@ -355,9 +377,7 @@ export default function TemplateBuilder() {
                   variant="primary"
                   fullWidth
                   disabled={
-                    confirmMutation.isPending ||
-                    !templateName.trim() ||
-                    subitems.filter((s) => s.name.trim()).length === 0
+                    confirmMutation.isPending || !isValid
                   }
                 >
                   {confirmMutation.isPending && (
@@ -373,8 +393,9 @@ export default function TemplateBuilder() {
                   Regenerate
                 </Button>
               </div>
-            </div>
+            </motion.div>
           )}
+          </AnimatePresence>
         </div>
       </div>
     </motion.div>

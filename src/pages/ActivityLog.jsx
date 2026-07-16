@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useQuery, keepPreviousData } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { IconChevronDown, IconChevronUp, IconCheck } from "@tabler/icons-react";
 import Badge from "../components/Badge";
 import EmptyState, { NoActivityIllustration, NoSearchResultsIllustration } from "../components/EmptyState";
@@ -226,7 +226,6 @@ export default function ActivityLog() {
     enabled:              !!queryId,
     staleTime:            0,
     retry:                false,
-    placeholderData:      keepPreviousData,
     refetchOnWindowFocus: false,
   });
 

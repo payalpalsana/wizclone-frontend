@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -59,6 +59,24 @@ export default function Settings() {
   const [automationEnabled, setAutomationEnabled] = useState(true);
   const syncedWorkspaceRef = useRef(null);
 
+  const hasChanges = useMemo(() => {
+    if (!settings) return false;
+
+    if (sensitivity !== (settings.sensitivity?.toLowerCase() ?? "balanced")) return true;
+    if (automationEnabled !== (settings.automation_enabled ?? true)) return true;
+
+    const initialBoards = settings.boards ?? [];
+    if (automationBoards.length !== initialBoards.length) return true;
+
+    for (const b of automationBoards) {
+      const initialB = initialBoards.find((ib) => String(ib.board_id) === String(b.board_id));
+      if (!initialB) return true;
+      if (b.board_enabled !== initialB.board_enabled) return true;
+    }
+
+    return false;
+  }, [settings, sensitivity, automationEnabled, automationBoards]);
+
   useEffect(() => {
     if (settings && syncedWorkspaceRef.current !== workspaceId) {
       setAutomationBoards(settings.boards ?? []);
@@ -109,16 +127,29 @@ export default function Settings() {
   const handleSave = async () => {
     setSaveState("saving");
     try {
-      await settingsApi.save(workspaceId, {
+      const response = await settingsApi.save(workspaceId, {
         sensitivity: sensitivity.toUpperCase(),
         automation_enabled: automationEnabled,
         boards: automationBoards,
       });
+
       syncedWorkspaceRef.current = null;
-      queryClient.invalidateQueries({ queryKey: ["settings", workspaceId] });
-      setSaveState("saved");
-      toast.success("Settings saved successfully");
-      setTimeout(() => setSaveState("idle"), 2000);
+      
+      // Reset the query to force the skeleton to show and automatically refetch updated data
+      queryClient.resetQueries({ queryKey: ["settings", workspaceId] });
+
+      if (response && response.success === false) {
+        let errorMsg = response.message || "Failed to save some settings";
+        if (response.failed_boards?.length > 0) {
+          errorMsg = `Failed to enable automation for: ${response.failed_boards.join(", ")}`;
+        }
+        toast.error(errorMsg);
+        setSaveState("idle");
+      } else {
+        setSaveState("saved");
+        toast.success("Settings saved successfully");
+        setTimeout(() => setSaveState("idle"), 2000);
+      }
     } catch {
       setSaveState("idle");
       toast.error("Failed to save settings");
@@ -540,7 +571,7 @@ export default function Settings() {
           zIndex: 40,
         }}
       >
-        <Button onClick={handleSave} disabled={saveState === "saving"}>
+        <Button onClick={handleSave} disabled={saveState === "saving" || saveState === "saved" || !hasChanges}>
           {saveState === "saving" && (
             <IconLoader2 size={14} className="animate-spin" />
           )}

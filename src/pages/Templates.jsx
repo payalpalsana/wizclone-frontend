@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useWindowWidth } from "../hooks/useWindowWidth";
 import { useDebounce } from "../hooks/useDebounce";
@@ -260,15 +260,25 @@ export default function Templates() {
       {!showSkeleton && !isError && templates.length > 0 && (
         <div style={{ flex: 1, minHeight: 0, overflowY: "auto", paddingBottom: 16 }}>
           <div className="flex flex-col gap-3">
-            {templates.map((t) => (
-              <TemplateCard
-                key={t.id}
-                template={t}
-                onUpdate={handleUpdate}
-                onDelete={handleDelete}
-                isDeleting={deleteMutation.isPending && deleteMutation.variables === t.id}
-              />
-            ))}
+            <AnimatePresence>
+              {templates.map((t) => (
+                <motion.div
+                  key={t.id}
+                  layout
+                  initial={{ opacity: 0, y: -20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <TemplateCard
+                    template={t}
+                    onUpdate={handleUpdate}
+                    onDelete={handleDelete}
+                    isDeleting={deleteMutation.isPending && deleteMutation.variables === t.id}
+                  />
+                </motion.div>
+              ))}
+            </AnimatePresence>
           </div>
 
           {/* Infinite scroll sentinel */}

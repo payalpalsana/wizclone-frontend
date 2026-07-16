@@ -88,6 +88,9 @@ export default function CreateTemplateModal({ open, onClose, onSubmit, isSubmitt
     onSubmit?.(payload);
   };
 
+  const hasValidSubitems = subitems.some((s) => s.name.trim() !== "");
+  const isValid = templateName.trim() !== "" && hasValidSubitems;
+
   return (
     <AnimatePresence>
       {open && (
@@ -186,7 +189,7 @@ export default function CreateTemplateModal({ open, onClose, onSubmit, isSubmitt
               <Button
                 variant="primary"
                 onClick={handleCreate}
-                disabled={!templateName.trim() || isSubmitting}
+                disabled={!isValid || isSubmitting}
               >
                 {isSubmitting && <IconLoader2 size={13} className="animate-spin" />}
                 {isSubmitting ? "Creating..." : "Create Template"}

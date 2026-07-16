@@ -9,7 +9,7 @@ import TemplateBuilder from "./pages/TemplateBuilder";
 import Help from "./pages/Help";
 import UpgradeModal from "./components/UpgradeModal";
 import { useWorkspace } from "./context/WorkspaceContext";
-import { IconLoader2, IconAlertTriangle } from "@tabler/icons-react";
+import { IconLoader2, IconAlertTriangle, IconLock } from "@tabler/icons-react";
 
 function AppLoader() {
   return (
@@ -31,7 +31,7 @@ function AppLoader() {
   );
 }
 
-function AppError({ message }) {
+function AppError({ title, message, hideRefresh }) {
   return (
     <div
       style={{
@@ -54,7 +54,7 @@ function AppError({ message }) {
           margin: 0,
         }}
       >
-        Connection Failed
+        {title || "Connection Failed"}
       </p>
       <p
         style={{
@@ -68,23 +68,91 @@ function AppError({ message }) {
       >
         {message || "Could not connect to WizClone. Please refresh the page."}
       </p>
-      <button
-        onClick={() => window.location.reload()}
+      {!hideRefresh && (
+        <button
+          onClick={() => window.location.reload()}
+          style={{
+            marginTop: 4,
+            height: 36,
+            paddingInline: 20,
+            borderRadius: 8,
+            border: "1px solid var(--border)",
+            backgroundColor: "transparent",
+            color: "var(--text-primary)",
+            fontSize: 13,
+            cursor: "pointer",
+            fontFamily: "inherit",
+          }}
+        >
+          Refresh
+        </button>
+      )}
+    </div>
+  );
+}
+
+function ViewerBlocker() {
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        minHeight: "100vh",
+        padding: 24,
+        backgroundColor: "var(--bg-primary)",
+      }}
+    >
+      <div
         style={{
-          marginTop: 4,
-          height: 36,
-          paddingInline: 20,
-          borderRadius: 8,
-          border: "1px solid var(--border)",
-          backgroundColor: "transparent",
-          color: "var(--text-primary)",
-          fontSize: 13,
-          cursor: "pointer",
-          fontFamily: "inherit",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          textAlign: "center",
+          maxWidth: 380,
+          animation: "fadeIn 0.4s ease-out",
         }}
       >
-        Refresh
-      </button>
+        <div
+          style={{
+            width: 64,
+            height: 64,
+            borderRadius: 32,
+            backgroundColor: "rgba(107, 114, 128, 0.08)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            marginBottom: 24,
+            border: "1px solid rgba(107, 114, 128, 0.1)",
+          }}
+        >
+          <IconLock size={32} style={{ color: "var(--text-secondary)" }} />
+        </div>
+        
+        <h1
+          style={{
+            fontSize: 22,
+            fontWeight: 600,
+            color: "var(--text-primary)",
+            margin: "0 0 12px 0",
+            letterSpacing: "-0.01em",
+          }}
+        >
+          View-Only Access
+        </h1>
+        
+        <p
+          style={{
+            fontSize: 15,
+            color: "var(--text-secondary)",
+            lineHeight: 1.6,
+            margin: 0,
+          }}
+        >
+          As a viewer, you are unable to use WizClone
+        </p>
+      </div>
     </div>
   );
 }
@@ -97,9 +165,11 @@ function RequireOAuth({ children }) {
 
 export default function App() {
   const [upgradeOpen, setUpgradeOpen] = useState(false);
-  const { loading, hasOAuth, error } = useWorkspace();
+  const { loading, hasOAuth, error, isViewOnly } = useWorkspace();
 
   if (loading) return <AppLoader />;
+
+  if (isViewOnly) return <ViewerBlocker />;
 
   if (error && hasOAuth === null) return <AppError message={error} />;
 

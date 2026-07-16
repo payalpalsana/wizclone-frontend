@@ -50,8 +50,11 @@ const TemplateEditor = ({ template, onSave, onCancel }) => {
     }
   };
 
+  const hasValidSubitems = subitems.some((s) => s.name.trim() !== "");
+  const isValid = name.trim() !== "" && hasValidSubitems;
+
   const handleSave = async () => {
-    if (!name.trim()) return;
+    if (!isValid) return;
     setError(null);
     setSaving(true);
     try {
@@ -169,13 +172,13 @@ const TemplateEditor = ({ template, onSave, onCancel }) => {
           <button
             type="button"
             onClick={handleSave}
-            disabled={saving || !name.trim()}
+            disabled={saving || !isValid}
             style={{
               height: 34, paddingInline: 14, borderRadius: 8, border: "none",
               backgroundColor: "var(--accent)", color: "#fff", fontSize: 14, fontWeight: 500,
-              cursor: saving || !name.trim() ? "not-allowed" : "pointer",
+              cursor: saving || !isValid ? "not-allowed" : "pointer",
               fontFamily: "inherit", display: "flex", alignItems: "center", gap: 6,
-              opacity: !name.trim() ? 0.6 : 1,
+              opacity: !isValid ? 0.6 : 1,
             }}
           >
             {saving && <IconLoader2 size={13} className="animate-spin" />}

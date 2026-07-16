@@ -119,7 +119,7 @@ export default function Sidebar({ plan = "Free" }) {
             >
               {plan}
             </span>
-            {plan === "Free" && (
+            {/* {plan === "Free" && (
               <a
                 href="#"
                 className="text-xs font-medium"
@@ -127,7 +127,7 @@ export default function Sidebar({ plan = "Free" }) {
               >
                 Upgrade
               </a>
-            )}
+            )} */}
           </div>
         ) : (
           <div
