@@ -81,7 +81,7 @@ export const fetchBoards = async () => {
   const data = await queryMonday(
     `
     query ($workspaceIds: [ID]) {
-      boards(workspace_ids: $workspaceIds) {
+      boards(workspace_ids: $workspaceIds, limit: 500) {
         id
         name
         type
@@ -91,11 +91,8 @@ export const fetchBoards = async () => {
     { workspaceIds: [workspaceId] },
   );
 
-  // type === "sub_items_board" is monday.com's API-level identifier for internal
-  // subitem boards. These are never shown in the sidebar and must not be selectable.
-  // board_kind (public/private/share) is NOT reliable - subitem boards return the
-  // same board_kind as their parent board.
-  return (data.boards ?? []).filter((b) => b.type !== "sub_items_board");
+  // type === "board" is the only type of board that should be visible.
+  return (data.boards ?? []).filter((b) => b.type === "board");
 };
 
 // export const fetchBoardItems = async (boardId) => {

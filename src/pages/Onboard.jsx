@@ -190,7 +190,7 @@ export default function Onboard() {
                 status === "success"
                   ? "var(--success, #22c55e)"
                   : "var(--accent)",
-              color: "#fff",
+              color: status === "success" ? "#fff" : "var(--text-color)",
               fontSize: 14,
               fontWeight: 500,
               border: "none",
